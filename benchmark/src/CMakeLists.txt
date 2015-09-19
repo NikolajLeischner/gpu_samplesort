@@ -6,6 +6,7 @@ SET(SOURCE_FILES
   benchmark/timer.cpp
   benchmark/timer.h
   benchmark/distributions.h
+  benchmark/distributions.cpp
   samplesort/samplesort.h
 )
 CUDA_COMPILE(CUDA_FILES 

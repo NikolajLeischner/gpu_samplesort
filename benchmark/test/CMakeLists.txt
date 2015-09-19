@@ -1,6 +1,6 @@
 set(SOURCES
   run_tests.cpp
-  bandit_test.cpp
+  distributions_test.cpp
 )
 
 add_executable(tests ${SOURCES} )

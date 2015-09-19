@@ -1,23 +1,62 @@
 #pragma once
 
-namespace GpuSortingBenchmark
+#include <cstddef>
+#include <vector>
+
+// Fill an array with a distribution of random values. 
+// The distributions described in http://www.umiacs.umd.edu/research/EXPAR/papers/3669/node5.html#SECTION00041000000000000000
+namespace Distributions
 {
-	/* Fills an array with a distribution of random values.The distributions described in http://www.umiacs.umd.edu/research/EXPAR/papers/3669/node5.html#SECTION00041000000000000000,
-	from 0 to 9: ZERO, UNIFORM, GAUSSIAN, BUCKET, STAGGERED, SORTED-ASCENDING, G-GROUPS, RANDOMIZED DUPLICATES, DETERMINISTIC DUPLICATES, SORTED-DESCENDING. */	
 template<typename T>
-abstract class Distribution
+class Distribution
 {
 public:
-  const T* const begin() const;
-  size_t size() const;
-  size_t memory_size() const;
-    
-  protected:
-    Distribution(size_t size);
-
-    T randomValue(size_t numBits, size_t numSamples);
+	const T* const begin() const;
+	const T* const end() const;
+	std::size_t size() const;
+	std::size_t memory_size() const;
+	Distribution(std::vector<T> content);
+	void print(std::size_t count) const;
+	std::vector<T> as_vector() const;
+private:
+	const std::vector<T> content;
 };
 
-}
+struct Settings
+{
+	Settings(std::size_t bits, std::size_t samples) : bits(bits), samples(samples) {}
 
-#include "distributions.inl"
+	const std::size_t bits;
+	const std::size_t samples;
+};
+
+template<typename T>
+Distribution<T> zero(std::size_t size);
+
+template<typename T>
+Distribution<T> sorted(std::size_t size, const Settings& settings);
+
+template<typename T>
+Distribution<T> sorted_descending(std::size_t size, const Settings& settings);
+
+template<typename T>
+Distribution<T> uniform(std::size_t size, const Settings& settings);
+
+template<typename T>
+Distribution<T> gaussian(std::size_t size, const Settings& settings);
+
+template<typename T>
+Distribution<T> bucket(std::size_t size, const Settings& settings, std::uint32_t p);
+
+template<typename T>
+Distribution<T> staggered(std::size_t size, const Settings& settings, std::uint32_t p);
+
+template<typename T>
+Distribution<T> g_groups(std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g);
+
+template<typename T>
+Distribution<T> random_duplicates(std::size_t size, const Settings& settings, std::uint32_t p, std::size_t range);
+
+template<typename T>
+Distribution<T> deterministic_duplicates(std::size_t size, const Settings& settings, std::uint32_t p);
+}
