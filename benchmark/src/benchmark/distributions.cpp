@@ -7,6 +7,8 @@
 #include <math.h>
 #include <numeric>
 #include <iostream>
+#include <map>
+#include <utility>
 
 namespace Distributions
 {
@@ -38,7 +40,7 @@ namespace Distributions
 
 	template<typename T>
 	Distribution<T>::Distribution(std::vector<T> content): content(content) {
-		static_assert(std::is_integral<T>(), "The type must be integral!");
+		static_assert(std::is_arithmetic<T>(), "The type must be arithmetic!");
 	}
 
 	template<typename T>
@@ -71,6 +73,58 @@ namespace Distributions
 	template<typename T>
 	std::vector<T> Distribution<T>::as_vector() const {
 		return content;
+	}
+
+	Type::Value Type::parse(std::string value) {
+
+		std::transform(value.begin(), value.end(), value.begin(), tolower);
+
+		std::map<std::string, Type::Value> types{
+			{"zero", Type::Value::zero},
+			{"sorted", Type::Value::sorted},
+			{"uniform", Type::Value::uniform},
+			{"gaussian", Type::Value::gaussian},
+			{"bucket", Type::Value::bucket},
+			{"staggered", Type::Value::staggered},
+			{"g-groups", Type::Value::g_groups},
+			{"sorted-descending", Type::Value::sorted_descending},
+			{"random-duplicates", Type::Value::random_duplicates},
+			{"deterministic-duplicates", Type::Value::deterministic_duplicates} };
+
+		auto result = types.find(value);
+		if (result == types.end()) {
+			throw new std::exception();
+		}
+		else {
+			return result->second;
+		}
+	}
+
+	template<typename T>
+	Distribution<T> create(Type type, std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g, std::uint32_t range) {
+		switch (type) {
+		case Type::sorted:
+			return sorted(size, settings);
+		case Type::uniform:
+			return uniform(size, settings);
+		case Type::gaussian:
+			return gaussian(size, settings);
+		case Type::bucket:
+			return bucket(size, settings, p);
+		case Type::g_groups:
+			return g_groups(size, settings, p, g);
+		case Type::sorted_descending:
+			return sorted_descending(size, settings);
+		case Type::staggered:
+			return staggered(size, settings, p);
+		case Type::deterministic_duplicates:
+			return deterministic_duplicates(size, settings, p);
+		case Type::random_duplicates:
+			return random_duplicates(size, settings, p, range);
+		case Type::zero:
+		case default:
+			return zero(size);
+		}
 	}
 
 	template<typename T>

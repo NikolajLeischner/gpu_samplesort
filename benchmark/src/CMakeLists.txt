@@ -1,10 +1,15 @@
 include_directories(
   benchmark
-  samplesort)
+  samplesort
+  tclap)
 
 SET(SOURCE_FILES 
   benchmark/timer.cpp
   benchmark/timer.h
+  benchmark/settings.cpp
+  benchmark/settings.h
+  benchmark/keytype.cpp
+  benchmark/keytype.h
   benchmark/distributions.h
   benchmark/distributions.cpp
   samplesort/samplesort.h

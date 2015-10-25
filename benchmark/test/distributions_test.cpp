@@ -5,7 +5,6 @@ using namespace bandit;
 using namespace Distributions;
 
 namespace {
-
 	void assert_size(Distribution<int> distribution, std::size_t expected_size) {
 		it("should have the correct size", [&]() {
 			AssertThat(distribution.size(), Equals(expected_size));
@@ -28,7 +27,7 @@ namespace {
 go_bandit([](){
   describe("Random distributions", [&]() {
 
-	  std::size_t size(100);
+	  std::size_t size(1000);
 	  std::uint32_t p(8);
 	  Settings settings(28, 1);
 
@@ -51,6 +50,17 @@ go_bandit([](){
 
 		  it("should be sorted", [&]() {
 			  AssertThat(std::is_sorted(distribution.begin(), distribution.end()), IsTrue());
+		  });
+	  });
+
+	  describe("descending sorted distributions", [&]() {
+		  auto distribution = sorted_descending<int>(size, settings);
+
+		  assert_size(distribution, size);
+
+		  it("should be sorted", [&]() {
+			  std::vector<int> data = distribution.as_vector();
+			  AssertThat(std::is_sorted(data.rbegin(), data.rend()), IsTrue());
 		  });
 	  });
 

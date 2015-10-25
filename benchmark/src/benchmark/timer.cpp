@@ -13,7 +13,6 @@ double Timer::stop() {
 	return ((double)(endtime.QuadPart - starttime.QuadPart)) / ((double)(freq.QuadPart / 1000.0));
 }
 
-
 #else
 
 void Timer::start() {
