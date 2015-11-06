@@ -1,17 +1,21 @@
 include_directories(
   benchmark
   samplesort
-  tclap)
+  external)
 
 SET(SOURCE_FILES 
-  benchmark/timer.cpp
-  benchmark/timer.h
-  benchmark/settings.cpp
-  benchmark/settings.h
-  benchmark/keytype.cpp
-  benchmark/keytype.h
   benchmark/distributions.h
   benchmark/distributions.cpp
+  benchmark/execution.h
+  benchmark/execution.cpp
+  benchmark/keytype.h
+  benchmark/keytype.cpp
+  benchmark/output.h
+  benchmark/output.cpp
+  benchmark/settings.h
+  benchmark/settings.cpp
+  benchmark/timer.h
+  benchmark/timer.cpp
   samplesort/samplesort.h
 )
 CUDA_COMPILE(CUDA_FILES 

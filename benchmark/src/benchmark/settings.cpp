@@ -22,7 +22,7 @@ namespace Benchmark
 		TCLAP::ValueArg<std::size_t> bits_per_key("b", "bits", "", false, 32, "");
 		TCLAP::ValueArg<bool> keys_have_values("v", "keys-have-values", "", false, false, "");
 		TCLAP::ValueArg<std::string> output("o", "output-file", "", false, "result.csv", "");
-		TCLAP::UnlabeledMultiArg<std::size_t> sizes("s", "sizes", false, "", false);
+		TCLAP::MultiArg<std::size_t> sizes("i", "sizes", "", true, "");
 
 		cmd.add(algorithm);
 		cmd.add(distribution);
@@ -36,6 +36,7 @@ namespace Benchmark
 		cmd.add(output);
 		cmd.add(sizes);
 
+		cmd.setExceptionHandling(false);
 		cmd.parse(argc, argv);
 
 		return Settings(Algorithm::parse(algorithm.getValue()),

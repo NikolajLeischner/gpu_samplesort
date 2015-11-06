@@ -1,18 +1,24 @@
 #include <iostream>
-#include <distributions.h>
-#include <settings.h>
+#include "distributions.h"
+#include "execution.h"
+#include "output.h"
+#include "settings.h"
 #include <tclap/CmdLine.h>
 
 int main(int argc, char *argv[]) 
 {  
+	using namespace Benchmark;
 	try {
+		auto settings = Settings::parse_from_cmd(argc, argv);
 
-		auto settings = Benchmark::Settings::parse_from_cmd(argc, argv);
+		auto results = execute_with_settings(settings);
+
+		print_results(results, settings.output_file);
 
 		return 0;
 	}
-	catch (TCLAP::ArgException &e) {
-		std::cerr << "error: " << e.error() << " for argument " << e.argId() << std::endl;
+	catch (std::exception &e) {
+		std::cerr << "Execution failed with exception: " << e.what() << std::endl;
 		return 1;
 	}
 }

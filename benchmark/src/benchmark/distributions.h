@@ -38,7 +38,7 @@ struct Type {
 
 
 template<typename T>
-Distribution<T> create(Type type, std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g, std::uint32_t range);
+Distribution<T> create(const Type::Value type, std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g, std::uint32_t range);
 
 template<typename T>
 Distribution<T> zero(std::size_t size);

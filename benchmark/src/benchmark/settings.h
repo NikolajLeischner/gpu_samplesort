@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <iostream>
 #include <math.h>
-#include <distributions.h>
-#include <keytype.h>
 #include <tclap/CmdLine.h>
+#include "distributions.h"
+#include "keytype.h"
 
 namespace Benchmark
 {
@@ -29,7 +29,7 @@ struct Settings {
 	const KeyType::Value key_type;
 	const bool keys_have_values;
 	const std::string output_file;
-	const std::vector<std::uint64_t> sizes;
+	const std::vector<std::size_t> sizes;
 
 private:
 

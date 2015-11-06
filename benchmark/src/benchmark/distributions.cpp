@@ -16,8 +16,8 @@ namespace Distributions
 		template<typename T>
 		class Random {
 		public:
-			Random(const Settings& settings): 
-				settings(settings), gen(std::mt19937(rd())), bits_to_remove(sizeof(T) * 8 - settings.bits) {
+			Random(const Settings& settings): settings(settings), gen(std::mt19937(rd())), 
+				bits_to_remove(sizeof(T) * 8 - settings.bits) {
 				gen.seed(17);
 			}
 
@@ -40,7 +40,7 @@ namespace Distributions
 
 	template<typename T>
 	Distribution<T>::Distribution(std::vector<T> content): content(content) {
-		static_assert(std::is_arithmetic<T>(), "The type must be arithmetic!");
+		static_assert(std::is_integral<T>(), "The type must be integral!");
 	}
 
 	template<typename T>
@@ -101,29 +101,28 @@ namespace Distributions
 	}
 
 	template<typename T>
-	Distribution<T> create(Type type, std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g, std::uint32_t range) {
+	Distribution<T> create(const Type::Value type, std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g, std::uint32_t range) {
 		switch (type) {
-		case Type::sorted:
-			return sorted(size, settings);
-		case Type::uniform:
-			return uniform(size, settings);
-		case Type::gaussian:
-			return gaussian(size, settings);
-		case Type::bucket:
-			return bucket(size, settings, p);
-		case Type::g_groups:
-			return g_groups(size, settings, p, g);
-		case Type::sorted_descending:
-			return sorted_descending(size, settings);
-		case Type::staggered:
-			return staggered(size, settings, p);
-		case Type::deterministic_duplicates:
-			return deterministic_duplicates(size, settings, p);
-		case Type::random_duplicates:
-			return random_duplicates(size, settings, p, range);
-		case Type::zero:
-		case default:
-			return zero(size);
+		case Type::Value::sorted:
+			return sorted<T>(size, settings);
+		case Type::Value::uniform:
+			return uniform<T>(size, settings);
+		case Type::Value::gaussian:
+			return gaussian<T>(size, settings);
+		case Type::Value::bucket:
+			return bucket<T>(size, settings, p);
+		case Type::Value::g_groups:
+			return g_groups<T>(size, settings, p, g);
+		case Type::Value::sorted_descending:
+			return sorted_descending<T>(size, settings);
+		case Type::Value::staggered:
+			return staggered<T>(size, settings, p);
+		case Type::Value::deterministic_duplicates:
+			return deterministic_duplicates<T>(size, settings, p);
+		case Type::Value::random_duplicates:
+			return random_duplicates<T>(size, settings, p, range);
+		case Type::Value::zero:
+			return zero<T>(size);
 		}
 	}
 
@@ -228,8 +227,8 @@ namespace Distributions
 		for (std::size_t i = 0; i < p; ++i) {
 			for (std::size_t j = 0; j < g; ++j) {
 
-				const T x = ((j * g) + (p / 2) + j) % p;
-				const T y = ((j * g) + (p / 2) + j + 1) % p;
+				const T x = static_cast<T>(((j * g) + (p / 2) + j) % p);
+				const T y = static_cast<T>(((j * g) + (p / 2) + j + 1) % p);
 
 				auto end = iterator + (size / (p * g));
 				std::generate(iterator, end, [&]() { return offset * x + random() % (offset * (y - x) - 1); });
@@ -252,7 +251,7 @@ namespace Distributions
 
 			std::vector<T> regions(range);
 			std::generate(regions.begin(), regions.end(), [&]() { return random() % static_cast<std::uint32_t>(range); });
-			const T sumOfRegions = std::accumulate(regions.begin(), regions.end(), 0);
+			const T sumOfRegions = std::accumulate(regions.begin(), regions.end(), static_cast<T>(0));
 			std::transform(regions.begin(), regions.end(), regions.begin(), [&](T value) { 
 				return (value * (static_cast<std::uint32_t>(size) / p)) / sumOfRegions; });
 
@@ -291,16 +290,44 @@ namespace Distributions
 		return Distribution<T>(content);
 	}
 
+	template class Distribution<std::uint16_t>;
+	template class Distribution<std::uint32_t>;
+	template class Distribution<std::uint64_t>;
 
-	template class Distribution<int>;
-	template Distribution<int> zero(std::size_t size);
-	template Distribution<int> sorted(std::size_t size, const Settings& settings);
-	template Distribution<int> sorted_descending(std::size_t size, const Settings& settings);
-	template Distribution<int> uniform(std::size_t size, const Settings& settings);
-	template Distribution<int> gaussian(std::size_t size, const Settings& settings);
-	template Distribution<int> bucket(std::size_t size, const Settings& settings, std::uint32_t p);
-	template Distribution<int> staggered(std::size_t size, const Settings& settings, std::uint32_t p);
-	template Distribution<int> g_groups(std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g);
-	template Distribution<int> random_duplicates(std::size_t size, const Settings& settings, std::uint32_t p, std::size_t range);
-	template Distribution<int> deterministic_duplicates(std::size_t size, const Settings& settings, std::uint32_t p);
+	template Distribution<std::uint16_t> create(Type::Value type, std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g, std::uint32_t range);
+	template Distribution<std::uint32_t> create(Type::Value type, std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g, std::uint32_t range);
+	template Distribution<std::uint64_t> create(Type::Value type, std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g, std::uint32_t range);
+	
+	template Distribution<std::uint16_t> zero(std::size_t size);
+	template Distribution<std::uint16_t> sorted(std::size_t size, const Settings& settings);
+	template Distribution<std::uint16_t> sorted_descending(std::size_t size, const Settings& settings);
+	template Distribution<std::uint16_t> uniform(std::size_t size, const Settings& settings);
+	template Distribution<std::uint16_t> gaussian(std::size_t size, const Settings& settings);
+	template Distribution<std::uint16_t> bucket(std::size_t size, const Settings& settings, std::uint32_t p);
+	template Distribution<std::uint16_t> staggered(std::size_t size, const Settings& settings, std::uint32_t p);
+	template Distribution<std::uint16_t> g_groups(std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g);
+	template Distribution<std::uint16_t> random_duplicates(std::size_t size, const Settings& settings, std::uint32_t p, std::size_t range);
+	template Distribution<std::uint16_t> deterministic_duplicates(std::size_t size, const Settings& settings, std::uint32_t p);
+
+	template Distribution<std::uint32_t> zero(std::size_t size);
+	template Distribution<std::uint32_t> sorted(std::size_t size, const Settings& settings);
+	template Distribution<std::uint32_t> sorted_descending(std::size_t size, const Settings& settings);
+	template Distribution<std::uint32_t> uniform(std::size_t size, const Settings& settings);
+	template Distribution<std::uint32_t> gaussian(std::size_t size, const Settings& settings);
+	template Distribution<std::uint32_t> bucket(std::size_t size, const Settings& settings, std::uint32_t p);
+	template Distribution<std::uint32_t> staggered(std::size_t size, const Settings& settings, std::uint32_t p);
+	template Distribution<std::uint32_t> g_groups(std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g);
+	template Distribution<std::uint32_t> random_duplicates(std::size_t size, const Settings& settings, std::uint32_t p, std::size_t range);
+	template Distribution<std::uint32_t> deterministic_duplicates(std::size_t size, const Settings& settings, std::uint32_t p);
+
+	template Distribution<std::uint64_t> zero(std::size_t size);
+	template Distribution<std::uint64_t> sorted(std::size_t size, const Settings& settings);
+	template Distribution<std::uint64_t> sorted_descending(std::size_t size, const Settings& settings);
+	template Distribution<std::uint64_t> uniform(std::size_t size, const Settings& settings);
+	template Distribution<std::uint64_t> gaussian(std::size_t size, const Settings& settings);
+	template Distribution<std::uint64_t> bucket(std::size_t size, const Settings& settings, std::uint32_t p);
+	template Distribution<std::uint64_t> staggered(std::size_t size, const Settings& settings, std::uint32_t p);
+	template Distribution<std::uint64_t> g_groups(std::size_t size, const Settings& settings, std::uint32_t p, std::uint32_t g);
+	template Distribution<std::uint64_t> random_duplicates(std::size_t size, const Settings& settings, std::uint32_t p, std::size_t range);
+	template Distribution<std::uint64_t> deterministic_duplicates(std::size_t size, const Settings& settings, std::uint32_t p);
 }

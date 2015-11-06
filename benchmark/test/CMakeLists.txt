@@ -1,6 +1,7 @@
 set(SOURCES
   run_tests.cpp
   distributions_test.cpp
+  settings_test.cpp
 )
 
 add_executable(tests ${SOURCES} )
