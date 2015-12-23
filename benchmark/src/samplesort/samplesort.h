@@ -1,9 +1,13 @@
 #pragma once
+#include <algorithm>
 
 namespace SampleSort
 {
-  void sort_by_key(unsigned int *keys, unsigned int *keysEnd, unsigned int *values);
-  void sort_by_key(unsigned long long *keys, unsigned long long *keysEnd, unsigned int *values);
-  void sort(unsigned int *keys, unsigned int *keysEnd);
-  void sort(unsigned long long *keys, unsigned long long *keysEnd);
+  void sort(std::uint16_t *begin, std::uint16_t *end);
+  void sort(std::uint32_t *begin, std::uint32_t *end);
+  void sort(std::uint64_t *begin, std::uint64_t *end);
+
+  void sort_by_key(std::uint16_t* begin, std::uint16_t* end, std::uint64_t* values);
+  void sort_by_key(std::uint32_t* begin, std::uint32_t* end, std::uint64_t* values);
+  void sort_by_key(std::uint64_t* begin, std::uint64_t* end, std::uint64_t* values);
 }
