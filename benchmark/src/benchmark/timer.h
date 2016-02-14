@@ -6,9 +6,11 @@
 class Timer
 {
 	LARGE_INTEGER starttime;
+	LARGE_INTEGER endtime;
 public:
 	void start();
-	double stop(); 
+	void stop();
+	double elapsed();
 };
 
 #else
@@ -17,9 +19,11 @@ public:
 class Timer
 {
 	struct timeval starttime;
+	struct timeval endtime;
 public:
 	void start();
-	double stop(); 
+	void stop();
+	double elapsed();
 };
 
 #endif

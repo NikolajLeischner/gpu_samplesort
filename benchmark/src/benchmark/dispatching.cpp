@@ -1,17 +1,17 @@
 #include "dispatching.h"
 #include "distributions.h"
+#include "timer.h"
+#include <ppl.h>
 
 namespace Benchmark
 {
 	namespace {
-		using namespace Distributions;
 
 		template<typename KeyType>
 		std::vector<Result> execute_with_settings(const Settings& settings) {
 			std::vector<Result> results;
-			for (const std::size_t& size : settings.sizes) {
+			for (const std::size_t& size : settings.sizes)
 				results.push_back(execute_for_size<KeyType>(settings, size));
-			}
 			return results;
 		}
 
@@ -20,12 +20,41 @@ namespace Benchmark
 			auto distribution = Distributions::create<KeyType>(settings.distribution_type, size,
 				settings.distribution_settings, settings.p, settings.g, settings.range);
 
-			return benchmark_algorithm<KeyType>(settings.algorithm, settings.keys_have_values, distribution);
+			Timer timer;
+			std::vector<KeyType> data(distribution.as_vector());
+			sort_with_algorithm<KeyType>(settings.algorithm, settings.keys_have_values, data, timer);
+
+			std::cout << "Sorting time was " << std::fixed << std::setprecision(4) << timer.elapsed() << "ms for " << 
+				size << " elements." << std::endl;
+
+			assert_result_is_sorted(distribution.as_vector(), data);
+
+			return Result(timer.elapsed(), distribution.size());
 		}
 
 		template<typename KeyType>
-		Result benchmark_algorithm(Benchmark::Algorithm::Value algorithm, bool keys_have_values, const Distribution<KeyType>& distribution) {
-			return Result(0.0, distribution.size());
+		void assert_result_is_sorted(const std::vector<KeyType>& data, const std::vector<KeyType>& result) {
+			std::vector<KeyType> ground_truth(data);
+			std::sort(ground_truth.begin(), ground_truth.end());
+			if (result != ground_truth)
+				throw std::exception("Sorting failed!");
+		}
+
+		template<typename KeyType>
+		void sort_with_algorithm(Algorithm::Value algorithm, bool keys_have_values, std::vector<KeyType>& data, Timer& timer) {
+
+			switch (algorithm) {
+			case Algorithm::Value::cpu_stl:
+				timer.start();
+				std::sort(data.begin(), data.end());
+				timer.stop();
+				break;
+			case Algorithm::Value::thrust:
+			case Algorithm::Value::samplesort:
+				std::string message = "Algorithm not implemented: " + Algorithm::as_string(algorithm);
+				throw std::exception(message.c_str());
+				break;
+			}
 		}
 	}
 

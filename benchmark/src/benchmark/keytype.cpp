@@ -13,10 +13,8 @@ KeyType::Value KeyType::parse(std::string value) {
 		{ "uint64", KeyType::Value::uint64_t }};
 
 	auto result = types.find(value);
-	if (result == types.end()) {
+	if (result == types.end())
 		throw new std::exception();
-	}
-	else {
+	else
 		return result->second;
-	}
 }

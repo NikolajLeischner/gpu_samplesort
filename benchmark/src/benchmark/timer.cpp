@@ -6,9 +6,12 @@ void Timer::start() {
 	QueryPerformanceCounter(&starttime);
 }
 
-double Timer::stop() {
-	LARGE_INTEGER endtime, freq;
+void Timer::stop() {
 	QueryPerformanceCounter(&endtime);
+}
+
+double Timer::elapsed() {
+	LARGE_INTEGER freq;
 	QueryPerformanceFrequency(&freq);
 	return ((double)(endtime.QuadPart - starttime.QuadPart)) / ((double)(freq.QuadPart / 1000.0));
 }
@@ -16,12 +19,14 @@ double Timer::stop() {
 #else
 
 void Timer::start() {
-	gettimeofday(&starttime,0);
+	gettimeofday(&starttime, 0);
+}
+
+void Timer::stop() {
+	gettimeofday(&endtime, 0);
 }
 
 double Timer::stop() {
-	struct timeval endtime;
-	gettimeofday(&endtime,0);
 	return (endtime.tv_sec - starttime.tv_sec) * 1000.0 + (endtime.tv_usec - starttime.tv_usec) / 1000.0;
 }
 

@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
 	}
 	catch (std::exception &e) {
 		std::cerr << "Execution failed with exception: " << e.what() << std::endl;
-		return 1;
+		return 0;
 	}
 }
 

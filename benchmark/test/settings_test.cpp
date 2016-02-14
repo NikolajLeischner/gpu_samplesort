@@ -23,7 +23,7 @@ go_bandit([]() {
 		it("should throw an exception if required arguments are missing", [&]() {
 			int argc(3);
 			char *argv[] = { "benchmark", "-a", "thrust" };
-			AssertThrows(std::exception, Settings::parse_from_cmd(argc, argv));
+			AssertThrows(std::exception, Settings::parse_from_cmd(argc, argv, true));
 		});
 
 	});

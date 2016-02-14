@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <iostream>
-#include <map>
 #include <settings.h>
 #include <distributions.h>
 #include <keytype.h>
@@ -8,7 +7,7 @@
 
 namespace Benchmark
 {
-	Settings Settings::parse_from_cmd(int argc, char *argv[]) {
+	Settings Settings::parse_from_cmd(int argc, char *argv[], bool disable_exception_handling) {
 		std::string version("0.1");
 		TCLAP::CmdLine cmd("", ' ', version);
 
@@ -36,7 +35,7 @@ namespace Benchmark
 		cmd.add(output);
 		cmd.add(sizes);
 
-		cmd.setExceptionHandling(false);
+		cmd.setExceptionHandling(!disable_exception_handling);
 		cmd.parse(argc, argv);
 
 		return Settings(Algorithm::parse(algorithm.getValue()),
@@ -47,21 +46,25 @@ namespace Benchmark
 			sizes.getValue());
 	}
 
+	namespace Algorithm {
 
 	Algorithm::Value Algorithm::parse(std::string value) {
-
 		std::transform(value.begin(), value.end(), value.begin(), tolower);
 
-		std::map<std::string, Algorithm::Value> types{
-			{ "thrust", Algorithm::Value::thrust },
-			{ "samplesort", Algorithm::Value::samplesort } };
-
 		auto result = types.find(value);
-		if (result == types.end()) {
+		if (result == types.end())
 			throw new std::exception();
-		}
-		else {
+		else
 			return result->second;
-		}
+	}
+
+	std::string Algorithm::as_string(Value value)
+	{
+		for (auto type : types)
+			if (type.second == value) 
+				return type.first;
+		return "";
+	}
+
 	}
 }

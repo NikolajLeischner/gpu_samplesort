@@ -65,9 +65,8 @@ namespace Distributions
 
 	template<typename T>
 	void Distribution<T>::print(std::size_t count) const {
-		for (std::size_t i = 0; i < std::min(count, size()); ++i) {
+		for (std::size_t i = 0; i < std::min(count, size()); ++i)
 			std::cout << *(begin() + i) << " ";
-		}
 	}
 
 	template<typename T>
@@ -92,12 +91,10 @@ namespace Distributions
 			{"deterministic-duplicates", Type::Value::deterministic_duplicates} };
 
 		auto result = types.find(value);
-		if (result == types.end()) {
+		if (result == types.end())
 			throw new std::exception();
-		}
-		else {
+		else
 			return result->second;
-		}
 	}
 
 	template<typename T>
@@ -199,12 +196,10 @@ namespace Distributions
 
 		for (std::size_t i = 0; i < p; ++i) {
 			T offset = std::numeric_limits<T>::max() / (p + 1);
-			if (i < (p / 2)) {
+			if (i < (p / 2))
 				offset *= (2 * p) + 1;
-			}
-			else {
+			else
 				offset *= (static_cast<std::uint32_t>(i) - (p / 2)) * 2;
-			}
 
 			auto end = iterator + (size / p);
 			std::generate(iterator, end, [&]() { return offset + (random() / p) + 1; });

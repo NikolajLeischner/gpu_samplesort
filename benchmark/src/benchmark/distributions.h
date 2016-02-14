@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <vector>
 
-// Fill an array with a distribution of random values. 
+// Fill an array with random values. 
 // The distributions described in http://www.umiacs.umd.edu/research/EXPAR/papers/3669/node5.html#SECTION00041000000000000000
 namespace Distributions
 {

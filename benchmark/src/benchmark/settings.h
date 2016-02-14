@@ -6,19 +6,26 @@
 #include <tclap/CmdLine.h>
 #include "distributions.h"
 #include "keytype.h"
+#include <map>
 
 namespace Benchmark
 {
-	struct Algorithm {
+	namespace Algorithm {
 
-		enum class Value { thrust, samplesort };
+		enum class Value { cpu_stl, thrust, samplesort };
 
-		static Value parse(std::string value);
+		Value parse(std::string value);
+		std::string as_string(Value value);
+
+		static const std::map<std::string, Algorithm::Value> types {
+			{ "thrust", Algorithm::Value::thrust },
+			{ "samplesort", Algorithm::Value::samplesort },
+			{ "cpu_stl", Algorithm::Value::cpu_stl } };
 	};
 
 struct Settings {
 
-	static Settings parse_from_cmd(int argc, char *argv[]);
+	static Settings parse_from_cmd(int argc, char *argv[], bool disable_exception_handling = false);
 
 	const Algorithm::Value algorithm;
 	const Distributions::Type::Value distribution_type;
