@@ -1,0 +1,34 @@
+<html>
+<body>
+<script src="./benchmark/js/jquery.min.js"></script>
+<script src="./benchmark/js/highcharts.js"></script>
+<div id="container" style="height: 300px"></div>
+<script>
+$(function () {
+    $('#container').highcharts({
+        chart: {
+            type: 'bar'
+        },
+        title: {
+            text: 'Fruit Consumption'
+        },
+        xAxis: {
+            categories: ['Apples', 'Bananas', 'Oranges']
+        },
+        yAxis: {
+            title: {
+                text: 'Fruit eaten'
+            }
+        },
+        series: [{
+            name: 'Jane',
+            data: [1, 0, 4]
+        }, {
+            name: 'John',
+            data: [5, 7, 3]
+        }],
+    });
+});
+</script>
+</body>
+</html>
