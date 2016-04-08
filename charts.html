@@ -3,21 +3,20 @@
 <script src="./benchmark/js/jquery.min.js"></script>
 <script src="./benchmark/js/highcharts.js"></script>
 <div id="container" style="height: 300px"></div>
+<div id="container" style="height: 300px"></div>
+<div id="container" style="height: 300px"></div>
 <script>
 $(function () {
     $('#container').highcharts({
         chart: {
-            type: 'bar'
+            type: 'line'
         },
         title: {
             text: 'Fruit Consumption'
         },
-        xAxis: {
-            categories: ['Apples', 'Bananas', 'Oranges']
-        },
         yAxis: {
             title: {
-                text: 'Fruit eaten'
+                text: 'Sorted elements / time [microseconds]'
             }
         },
         series: [{
