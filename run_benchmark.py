@@ -2,6 +2,7 @@ import argparse
 import json
 import subprocess
 import itertools
+import pystache
 
 
 def run_benchmark():
@@ -12,20 +13,41 @@ def run_benchmark():
 
     configuration = json.load(open(args.configuration))
 
-    for experiment in configuration["experiments"]:
-        run_experiment(args.executable, configuration["algorithms"], experiment)
+    results = []
+    for index, experiment in enumerate(configuration["experiments"]):
+        results += [run_experiment(args.executable, configuration["algorithms"], experiment, index)]
+
+    context = {"chart": results}
+    template = open("charts.mustache").read()
+    output = open("charts.html", "w")
+    output.write(pystache.render(template, context))
 
 
-def run_experiment(executable, algorithms, experiment):
-    sizes = size_arguments_experiment(experiment)
+def run_experiment(executable, algorithms, experiment, index):
+    sizes = size_arguments_for_experiment(experiment)
     settings = experiment["settings"].split()
+    title = experiment["title"]
+    results = []
+    file_name = "data/result" + str(index) + ".csv"
     for algorithm in algorithms:
-        args = [executable, "-a", algorithm] + sizes + settings
-        print("Running benchmark '" + experiment["title"] + "': " + str(args))
+        args = [executable, "-a", algorithm, "-o", file_name] + sizes + settings
+        print("Running benchmark '" + title + "': " + str(args))
         subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        results += [parse_result(file_name, algorithm)]
+    return chart_data_for_experiment(title, results, index)
 
 
-def size_arguments_experiment(experiment):
+def chart_data_for_experiment(title, results, index):
+    return {"id": index, "title": title, "series": json.dumps(results)}
+
+
+def parse_result(result_file, algorithm_name):
+    data = [[int(line.split(";")[0]), float(line.split(";")[1])] for line in open(result_file)]
+    return {"name": algorithm_name,
+            "data": list(map(lambda x: [x[0], 1000000 * x[1] / x[0]], data))}
+
+
+def size_arguments_for_experiment(experiment):
     steps = experiment["steps"] - 1
     step = int((experiment["maximum_size"] - experiment["minimum_size"]) / steps)
     sizes = [experiment["minimum_size"] + i * step for i in range(steps)] + [experiment["maximum_size"]]
@@ -38,6 +60,3 @@ def flat_map(func, *iterable):
 
 if __name__ == "__main__":
     run_benchmark()
-
-
-

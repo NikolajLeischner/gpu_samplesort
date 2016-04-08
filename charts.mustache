@@ -2,32 +2,28 @@
 <body>
 <script src="./benchmark/js/jquery.min.js"></script>
 <script src="./benchmark/js/highcharts.js"></script>
-<div id="container" style="height: 300px"></div>
-<div id="container" style="height: 300px"></div>
-<div id="container" style="height: 300px"></div>
+
+{{#chart}}
+<div id="chart-{{id}}" style="height: 300px"></div>
 <script>
 $(function () {
-    $('#container').highcharts({
+    $('#chart-{{id}}').highcharts({
         chart: {
             type: 'line'
         },
         title: {
-            text: 'Fruit Consumption'
+            text: '{{title}}'
         },
         yAxis: {
             title: {
                 text: 'Sorted elements / time [microseconds]'
             }
         },
-        series: [{
-            name: 'Jane',
-            data: [1, 0, 4]
-        }, {
-            name: 'John',
-            data: [5, 7, 3]
-        }],
+        series: {{{series}}},
     });
 });
 </script>
+{{/chart}}
+
 </body>
 </html>
