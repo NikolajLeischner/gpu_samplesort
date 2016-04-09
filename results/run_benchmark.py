@@ -17,10 +17,9 @@ def run_benchmark():
     for index, experiment in enumerate(configuration["experiments"]):
         results += [run_experiment(args.executable, configuration["algorithms"], experiment, index)]
 
-    context = {"chart": results}
     template = open("charts.mustache").read()
-    output = open("charts.html", "w")
-    output.write(pystache.render(template, context))
+    html = pystache.render(template, {"chart": results})
+    open("charts.html", "w").write(html)
 
 
 def run_experiment(executable, algorithms, experiment, index):
