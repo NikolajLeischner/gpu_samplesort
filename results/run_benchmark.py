@@ -1,7 +1,9 @@
 import argparse
-import json
-import subprocess
 import itertools
+import json
+import os
+import subprocess
+
 import pystache
 
 
@@ -12,6 +14,8 @@ def run_benchmark():
     args = parser.parse_args()
 
     configuration = json.load(open(args.configuration))
+
+    os.mkdir("data")
 
     results = []
     for index, experiment in enumerate(configuration["experiments"]):
@@ -28,6 +32,7 @@ def run_experiment(executable, algorithms, experiment, index):
     title = experiment["title"]
     results = []
     file_name = "data/result" + str(index) + ".csv"
+    remove_file(file_name)
     for algorithm in algorithms:
         args = [executable, "-a", algorithm, "-o", file_name] + sizes + settings
         print("Running benchmark '" + title + "': " + str(args))
@@ -51,6 +56,13 @@ def size_arguments_for_experiment(experiment):
     step = int((experiment["maximum_size"] - experiment["minimum_size"]) / steps)
     sizes = [experiment["minimum_size"] + i * step for i in range(steps)] + [experiment["maximum_size"]]
     return list(flat_map(lambda x: ["-i", str(x)], sizes))
+
+
+def remove_file(file_name):
+    try:
+        os.remove(file_name)
+    except OSError:
+        pass
 
 
 def flat_map(func, *iterable):
