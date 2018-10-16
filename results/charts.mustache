@@ -13,28 +13,49 @@
 
   <body>
     <script src="./js/jquery.min.js"></script>
-    <script src="./js/highcharts.js"></script>
     <script src="./js/bootstrap.min.js"></script>
+    <script src="./js/Chart.bundle.min.js"></script>
 
     <div class="container-fluid">
         <div class="row">
         {{#chart}}
-        <div id="chart-{{id}}" class="col-md-4"></div>
+        <div id="chart-{{id}}" class="col-md-4">
+            <canvas id="canvas-{{id}}" width="800" height="450"></canvas>
+        </div>
         <script>
         $(function () {
-            $('#chart-{{id}}').highcharts({
-                chart: {
-                    type: 'line'
+            new Chart(document.getElementById('canvas-{{id}}'),
+            {
+                type: 'line',
+                options: {
+                  title: {
+                      display: true,
+                      text: '{{title}}'
+                  },
+                 scales: {
+                   xAxes: [{
+                     position: 'bottom',
+                     gridLines: {
+                       zeroLineColor: "rgba(0,255,0,1)"
+                     },
+                     type: 'linear'
+                   }],
+                   yAxes: [{
+                     position: 'left',
+                     gridLines: {
+                       zeroLineColor: "rgba(0,255,0,1)"
+                     },
+                     scaleLabel: {
+                       display: true,
+                       labelString: 'Sorted elements / time [microseconds]'
+                     },
+                     type: 'linear'
+                   }]
+                 }
                 },
-                title: {
-                    text: '{{title}}'
-                },
-                yAxis: {
-                    title: {
-                        text: 'Sorted elements / time [microseconds]'
-                    }
-                },
-                series: {{{series}}},
+                data: {
+                  datasets: {{{series}}}
+                }
             });
         });
         </script>

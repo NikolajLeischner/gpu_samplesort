@@ -1,33 +1,33 @@
-#include "Timer.h"
+#include "timer.h"
 
 #ifdef _MSC_VER
 
 void Timer::start() {
-	QueryPerformanceCounter(&starttime);
+    QueryPerformanceCounter(&start_time);
 }
 
 void Timer::stop() {
-	QueryPerformanceCounter(&endtime);
+    QueryPerformanceCounter(&end_time);
 }
 
 double Timer::elapsed() {
-	LARGE_INTEGER freq;
-	QueryPerformanceFrequency(&freq);
-	return ((double)(endtime.QuadPart - starttime.QuadPart)) / ((double)(freq.QuadPart / 1000.0));
+    LARGE_INTEGER freq;
+    QueryPerformanceFrequency(&freq);
+    return ((double) (end_time.QuadPart - start_time.QuadPart)) / ((double) (freq.QuadPart / 1000.0));
 }
 
 #else
 
 void Timer::start() {
-	gettimeofday(&starttime, 0);
+    gettimeofday(&start_time, 0);
 }
 
 void Timer::stop() {
-	gettimeofday(&endtime, 0);
+    gettimeofday(&end_time, 0);
 }
 
 double Timer::stop() {
-	return (endtime.tv_sec - starttime.tv_sec) * 1000.0 + (endtime.tv_usec - starttime.tv_usec) / 1000.0;
+    return (end_time.tv_sec - start_time.tv_sec) * 1000.0 + (end_time.tv_usec - start_time.tv_usec) / 1000.0;
 }
 
 #endif

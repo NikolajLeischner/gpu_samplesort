@@ -4,7 +4,7 @@ import json
 import os
 import subprocess
 
-import pystache
+import chevron
 
 
 def run_benchmark():
@@ -15,14 +15,14 @@ def run_benchmark():
 
     configuration = json.load(open(args.configuration))
 
-    os.mkdir("data")
+    os.makedirs("data", exist_ok=True)
 
     results = []
     for index, experiment in enumerate(configuration["experiments"]):
         results += [run_experiment(args.executable, configuration["algorithms"], experiment, index)]
 
     template = open("charts.mustache").read()
-    html = pystache.render(template, {"chart": results})
+    html = chevron.render(template, {"chart": results})
     open("charts.html", "w").write(html)
 
 
@@ -47,8 +47,8 @@ def chart_data_for_experiment(title, results, index):
 
 def parse_result(result_file, algorithm_name):
     data = [[int(line.split(";")[0]), float(line.split(";")[1])] for line in open(result_file)]
-    return {"name": algorithm_name,
-            "data": list(map(lambda x: [x[0], 1000000 * x[1] / x[0]], data))}
+    return {"label": algorithm_name, "fill": False,
+            "data": list(map(lambda x: { "x": x[0], "y": 1000000 * x[1] / x[0] }, data))}
 
 
 def size_arguments_for_experiment(experiment):
