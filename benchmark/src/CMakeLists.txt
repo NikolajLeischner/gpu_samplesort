@@ -19,12 +19,9 @@ SET(SOURCE_FILES
   benchmark/timer.h
   benchmark/timer.cpp
   samplesort/samplesort.h
-)
-CUDA_COMPILE(CUDA_FILES 
-  #benchmark/gpu_dispatching.cu
+  benchmark/gpu_dispatching.cu
 )
 
-CUDA_ADD_LIBRARY(gpu_samplesort ${CUDA_FILES} ${SOURCE_FILES})
+ADD_LIBRARY(gpu_samplesort ${SOURCE_FILES})
 ADD_EXECUTABLE(benchmark benchmark.cpp)
-TARGET_LINK_LIBRARIES(benchmark gpu_samplesort ${CUDA_LIBRARIES})
-
+TARGET_LINK_LIBRARIES(benchmark gpu_samplesort)

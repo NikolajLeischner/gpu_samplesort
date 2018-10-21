@@ -43,7 +43,7 @@ namespace Distributions {
     }
 
     template<typename T>
-    const T *const Distribution<T>::begin() const {
+    const T* Distribution<T>::begin() const {
         return content.data();
     }
 
@@ -53,7 +53,7 @@ namespace Distributions {
     }
 
     template<typename T>
-    const T *const Distribution<T>::end() const {
+    const T* Distribution<T>::end() const {
         return content.data() + size();
     }
 

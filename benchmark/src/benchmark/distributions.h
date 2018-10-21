@@ -9,9 +9,9 @@ namespace Distributions {
     template<typename T>
     class Distribution {
     public:
-        const T *const begin() const;
+        const T* begin() const;
 
-        const T *const end() const;
+        const T* end() const;
 
         std::uint64_t size() const;
 
@@ -54,7 +54,7 @@ namespace Distributions {
 
     template<typename T>
     Distribution<T>
-    create(const Type::Value type, std::uint64_t size, const Settings &settings, std::uint32_t p, std::uint32_t g,
+    create(Type::Value type, std::uint64_t size, const Settings &settings, std::uint32_t p, std::uint32_t g,
            std::uint32_t range);
 
     template<typename T>

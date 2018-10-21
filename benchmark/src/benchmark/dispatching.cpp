@@ -1,5 +1,6 @@
 #include "dispatching.h"
 #include "distributions.h"
+#include "gpu_dispatching.h"
 #include "timer.h"
 #include <ppl.h>
 
@@ -56,6 +57,9 @@ namespace Benchmark {
                     break;
                 case Algorithm::Value::thrust:
                 case Algorithm::Value::samplesort:
+                    timer.start();
+                    benchmark_algorithm(algorithm, keys_have_values, data);
+                    timer.stop();
                     std::string message = "Algorithm not implemented: " + Algorithm::as_string(algorithm);
                     throw std::exception(message.c_str());
                     break;
