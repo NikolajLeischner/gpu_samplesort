@@ -36,7 +36,7 @@ namespace Benchmark {
         template<typename KeyType>
         void assert_result_is_sorted(const std::vector<KeyType> &data, const std::vector<KeyType> &result) {
             std::vector<KeyType> ground_truth(data);
-            std::sort(ground_truth.begin(), ground_truth.end());
+            Concurrency::parallel_sort(ground_truth.begin(), ground_truth.end());
             if (result != ground_truth)
                 throw std::exception("Sorting failed!");
         }
@@ -57,11 +57,11 @@ namespace Benchmark {
                     break;
                 case Algorithm::Value::thrust:
                 case Algorithm::Value::samplesort:
+                    // Run once to ensure the GPU kernels are compiled before benchmarking.
+                    benchmark_algorithm(algorithm, keys_have_values, data);
                     timer.start();
                     benchmark_algorithm(algorithm, keys_have_values, data);
                     timer.stop();
-                    std::string message = "Algorithm not implemented: " + Algorithm::as_string(algorithm);
-                    throw std::exception(message.c_str());
                     break;
             }
         }

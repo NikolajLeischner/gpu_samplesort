@@ -31,13 +31,13 @@ def run_experiment(executable, algorithms, experiment, index):
     settings = experiment["settings"].split()
     title = experiment["title"]
     results = []
-    file_name = "data/result" + str(index) + ".csv"
-    remove_file(file_name)
     for algorithm in algorithms:
+        file_name = "data/result-" + str(index) + "-" + algorithm + ".csv"
         args = [executable, "-a", algorithm, "-o", file_name] + sizes + settings
         print("Running benchmark '" + title + "': " + str(args))
         subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         results += [parse_result(file_name, algorithm)]
+        # remove_file(file_name)
     return chart_data_for_experiment(title, results, index)
 
 
@@ -48,7 +48,7 @@ def chart_data_for_experiment(title, results, index):
 def parse_result(result_file, algorithm_name):
     data = [[int(line.split(";")[0]), float(line.split(";")[1])] for line in open(result_file)]
     return {"label": algorithm_name, "fill": False,
-            "data": list(map(lambda x: { "x": x[0], "y": 1000000 * x[1] / x[0] }, data))}
+            "data": list(map(lambda x: {"x": x[0], "y": (x[0] / x[1]) / 1000.0}, data))}
 
 
 def size_arguments_for_experiment(experiment):
