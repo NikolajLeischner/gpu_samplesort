@@ -2,6 +2,7 @@
 #include "distributions.h"
 #include <thrust/device_vector.h>
 #include <thrust/sort.h>
+#include "../samplesort/samplesort.h"
 
 
 namespace Benchmark {
@@ -26,7 +27,7 @@ namespace Benchmark {
                 thrust::sort_by_key(keys_ptr, keys_ptr + data.size(), values_ptr);
             }
             else if (algorithm == Benchmark::Algorithm::Value::samplesort) {
-
+                SampleSort::sort_by_key(device_keys, device_keys + data.size(), device_values);
             }
 
             cudaMemcpy(values.as_vector().data(), device_values, values.memory_size(), cudaMemcpyDeviceToHost);
@@ -36,7 +37,7 @@ namespace Benchmark {
                 thrust::sort(keys_ptr, keys_ptr + data.size());
             }
             else if (algorithm == Benchmark::Algorithm::Value::samplesort) {
-
+                SampleSort::sort(device_keys, device_keys + data.size());
             }
         }
 

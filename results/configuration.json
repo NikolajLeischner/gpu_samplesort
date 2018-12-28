@@ -1,40 +1,40 @@
 {
-  "algorithms": ["cpu_parallel", "thrust"],
+  "algorithms": ["samplesort", "thrust"],
   "experiments": [
     {
       "title": "uniform random",
       "settings": "-d uniform",
       "minimum_size": 1000000,
-      "maximum_size": 100000000,
-      "steps": 4
+      "maximum_size": 80000000,
+      "steps": 3
     },
     {
       "title": "staggered",
       "settings": "-d staggered",
       "minimum_size": 1000000,
-      "maximum_size": 100000000,
-      "steps": 4
+      "maximum_size": 80000000,
+      "steps": 3
     },
     {
       "title": "random duplicates",
       "settings": "-d random-duplicates",
       "minimum_size": 1000000,
-      "maximum_size": 100000000,
-      "steps": 4
+      "maximum_size": 80000000,
+      "steps": 3
     },
     {
       "title": "uniform random 64bit",
       "settings": "-d uniform -k uint64",
       "minimum_size": 1000000,
-      "maximum_size": 100000000,
-      "steps": 4
+      "maximum_size": 80000000,
+      "steps": 3
     },
     {
       "title": "64bit low entropy",
       "settings": "-d uniform -k uint64 -s 5",
       "minimum_size": 1000000,
-      "maximum_size": 100000000,
-      "steps": 4
+      "maximum_size": 80000000,
+      "steps": 3
     }
   ]
 }

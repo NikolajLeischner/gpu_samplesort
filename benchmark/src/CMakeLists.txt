@@ -19,6 +19,7 @@ SET(SOURCE_FILES
   benchmark/timer.h
   benchmark/timer.cpp
   samplesort/samplesort.h
+  samplesort/samplesort.cu
   benchmark/gpu_dispatching.cu
 )
 
