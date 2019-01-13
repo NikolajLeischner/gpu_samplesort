@@ -2,5 +2,6 @@ bin
 .idea
 benchmark/.vs
 benchmark/cmake-build*
+benchmark/src/cmake-build*
 *.pyc
 results/charts.html

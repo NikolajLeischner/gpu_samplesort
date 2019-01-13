@@ -25,34 +25,31 @@
 * OTHER DEALINGS IN THE SOFTWARE.
 **/
 
-#include "../SampleSort.h"
-#include "Bucket.inl"
+#pragma once
 
-namespace SampleSort
-{
-  // Each CTA copies the data of one bucket from the buffer to the input array. 
-  template<int CTA_SIZE, typename KeyType>
-  __global__ void CTACopyBuckets(KeyType *keysInput, KeyType *keysBuffer, struct Bucket *bucketParams)
-  {
-    const int from = bucketParams[blockIdx.x].start;
-    const int to = from + bucketParams[blockIdx.x].size;
+#include "bucket.h"
 
-    for (int i = threadIdx.x + from; i < to; i += CTA_SIZE)
-      keysInput[i] = keysBuffer[i];    
-  }
+namespace SampleSort {
+    // Each CTA copies the data of one bucket from the buffer to the input array.
+    template<int CTA_SIZE, typename KeyType>
+    __global__ void copy_buckets(KeyType *keysInput, KeyType *keysBuffer, struct Bucket *bucketParams) {
+        const int from = bucketParams[blockIdx.x].start;
+        const int to = from + bucketParams[blockIdx.x].size;
 
-  // Same as above but for key-value-pairs.
-  template<int CTA_SIZE, typename KeyType, typename ValueType>
-  __global__ void CTACopyBucketsKeyValue(KeyType *keysInput, KeyType *keysBuffer, ValueType *valuesInput,
-    ValueType *valuesBuffer, struct Bucket *bucketParams)
-  {
-    const int from = bucketParams[blockIdx.x].start;
-    const int to = from + bucketParams[blockIdx.x].size;
-
-    for (int i = threadIdx.x + from; i < to; i += CTA_SIZE)
-    {
-      keysInput[i] = keysBuffer[i];   
-      valuesInput[i] = valuesBuffer[i];   
+        for (int i = threadIdx.x + from; i < to; i += CTA_SIZE)
+            keysInput[i] = keysBuffer[i];
     }
-  }
+
+    // Same as above but for key-value-pairs.
+    template<int CTA_SIZE, typename KeyType, typename ValueType>
+    __global__ void copy_buckets(KeyType *keysInput, KeyType *keysBuffer, ValueType *valuesInput,
+                                           ValueType *valuesBuffer, struct Bucket *bucketParams) {
+        const int from = bucketParams[blockIdx.x].start;
+        const int to = from + bucketParams[blockIdx.x].size;
+
+        for (int i = threadIdx.x + from; i < to; i += CTA_SIZE) {
+            keysInput[i] = keysBuffer[i];
+            valuesInput[i] = valuesBuffer[i];
+        }
+    }
 }

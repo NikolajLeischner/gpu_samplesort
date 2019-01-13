@@ -7,4 +7,3 @@ struct KeyType {
 
     static Value parse(std::string value);
 };
-

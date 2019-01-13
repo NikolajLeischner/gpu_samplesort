@@ -25,23 +25,23 @@
 * OTHER DEALINGS IN THE SOFTWARE.
 **/
 
-#include "../SampleSort.h"
+#include "constants.h"
 
 namespace SampleSort
 {
   // Create bucket counters which are relative to the CTA. To obtain global
   // offsets for scattering a prefix sum has to be performed afterwards.
-  template<typename KeyType, typename StrictWeakOrdering, int K, int LOG_K, int CTA_SIZE, int COUNTERS, int COUNTER_COPIES, bool DEGENERATED>
-  __global__ static void globalFindBuckets(KeyType *keys,	int minPos,	int maxPos,	int *globalBuckets,	
-    int elementsPerThread, // The number of keys each thread processes. I.e. the number of CTAs required for buckets of 
+  template<typename KeyType, typename CompType, int K, int LOG_K, int CTA_SIZE, int COUNTERS, int COUNTER_COPIES, bool DEGENERATED>
+  __global__ static void find_buckets(KeyType *keys,	int minPos,	int maxPos,	int *globalBuckets,
+    int elementsPerThread, // The number of keys each thread processes. I.e. the number of CTAs required for buckets of
     // different sizes can be adjusted. For one bucket the bucket-finding and scattering kernel must use the same value.
-    StrictWeakOrdering comp) 			
-  {		
+                                      CompType comp)
+  {
     const int LOCAL_COUNTERS = COUNTERS * COUNTER_COPIES;
     // This reduces register usage.
     __shared__ int block;
     __shared__ int grid;
-    if (threadIdx.x == 0) 
+    if (threadIdx.x == 0)
     {
       block = blockIdx.x;
       grid = gridDim.x;
@@ -54,15 +54,15 @@ namespace SampleSort
 
     __shared__ KeyType bst[K];
     __shared__ int buckets[K * LOCAL_COUNTERS];
-    
-    KeyType *constBst = reinterpret_cast<KeyType*>(bstCache);	
+
+    KeyType *constBst = reinterpret_cast<KeyType*>(bst_cache);
 
     for (int i = threadIdx.x; i < K * LOCAL_COUNTERS; i += CTA_SIZE) buckets[i] = 0;
 
     if (!DEGENERATED)
     {
       for (int i = threadIdx.x; i < K; i += CTA_SIZE) bst[i] = constBst[i];
-    }    
+    }
     // All splitters for the bucket are identical, don't even load the bst but just one splitter.
     else if (threadIdx.x == 0) bst[0] = constBst[0];
     __syncthreads();
@@ -95,7 +95,7 @@ namespace SampleSort
     __syncthreads();
 
     // Sum up and write back CTA bucket counters.
-    for (int i = threadIdx.x; i < K; i += CTA_SIZE) 
+    for (int i = threadIdx.x; i < K; i += CTA_SIZE)
     {
       for (int j = 0; j < COUNTERS; ++j)
       {
@@ -104,7 +104,7 @@ namespace SampleSort
           b += buckets[i * LOCAL_COUNTERS + j + k * COUNTERS];
 
         globalBuckets[(i * grid * COUNTERS) + (block * COUNTERS) + j] = b;
-      }		
+      }
     }
   }
 }

@@ -1,9 +1,21 @@
-set(SOURCES
+CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
+
+PROJECT(tests)
+
+ENABLE_LANGUAGE(CUDA)
+
+SET(CMAKE_CUDA_STANDARD 11)
+SET(CMAKE_CXX_STANDARD 17)
+SET(CMAKE_CUDA_STANDARD_REQUIRED TRUE)
+SET(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+
+SET(SOURCES
   run_tests.cpp
   distributions_test.cpp
   settings_test.cpp
 )
 
-add_executable(tests ${SOURCES} )
-target_link_libraries(tests gpu_samplesort ${CUDA_LIBRARIES})
+ADD_EXECUTABLE(tests ${SOURCES} )
+TARGET_LINK_LIBRARIES(tests gpu_samplesort ${CUDA_LIBRARIES})
 

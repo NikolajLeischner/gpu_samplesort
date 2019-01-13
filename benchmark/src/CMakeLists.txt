@@ -1,28 +1,42 @@
-include_directories(
-  benchmark
-  samplesort
-  external)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
 
-SET(SOURCE_FILES 
-  benchmark/distributions.h
-  benchmark/distributions.cpp
-  benchmark/dispatching.h
-  benchmark/dispatching.cpp
-  benchmark/gpu_dispatching.h
-  benchmark/keytype.h
-  benchmark/keytype.cpp
-  benchmark/output.h
-  benchmark/output.cpp
-  benchmark/result.h
-  benchmark/settings.h
-  benchmark/settings.cpp
-  benchmark/timer.h
-  benchmark/timer.cpp
-  samplesort/samplesort.h
-  samplesort/samplesort.cu
-  benchmark/gpu_dispatching.cu
-)
+PROJECT(benchmark)
+
+ENABLE_LANGUAGE(CUDA)
+
+SET(CMAKE_CUDA_STANDARD 11)
+SET(CMAKE_CXX_STANDARD 17)
+SET(CMAKE_CUDA_STANDARD_REQUIRED TRUE)
+SET(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+SET(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+
+INCLUDE_DIRECTORIES(
+        benchmark
+        samplesort
+        external)
+
+SET(SOURCE_FILES
+        benchmark/distributions.h
+        benchmark/distributions.cpp
+        benchmark/dispatching.h
+        benchmark/dispatching.cpp
+        benchmark/gpu_dispatching.h
+        benchmark/keytype.h
+        benchmark/keytype.cpp
+        benchmark/output.h
+        benchmark/output.cpp
+        benchmark/result.h
+        benchmark/settings.h
+        benchmark/constants.cpp
+        benchmark/timer.h
+        benchmark/timer.cpp
+        samplesort/samplesort.cu
+        samplesort/samplesort.h
+        benchmark/gpu_dispatching.cu
+        )
 
 ADD_LIBRARY(gpu_samplesort ${SOURCE_FILES})
-ADD_EXECUTABLE(benchmark benchmark.cpp)
-TARGET_LINK_LIBRARIES(benchmark gpu_samplesort)
+
+ADD_EXECUTABLE(${PROJECT_NAME} benchmark/benchmark.cpp)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} gpu_samplesort ${CUDA_LIBRARIES})

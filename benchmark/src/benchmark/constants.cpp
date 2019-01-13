@@ -58,7 +58,7 @@ namespace Benchmark {
         }
 
         std::string as_string(Value value) {
-            for (auto type : types)
+            for (const auto &type : types)
                 if (type.second == value)
                     return type.first;
             return "";

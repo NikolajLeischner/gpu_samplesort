@@ -9,9 +9,9 @@ namespace Distributions {
     template<typename T>
     class Distribution {
     public:
-        const T* begin() const;
+        const T *begin() const;
 
-        const T* end() const;
+        const T *end() const;
 
         std::uint64_t size() const;
 

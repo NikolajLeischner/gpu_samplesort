@@ -24,7 +24,7 @@
 * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 * OTHER DEALINGS IN THE SOFTWARE.
 **/
-
+#include <iostream>
 #include <algorithm>
 #include <stack>
 #include <vector>
@@ -38,16 +38,19 @@
 #include <thrust/detail/type_traits.h>
 #include <thrust/functional.h>
 
-#include "samplesort/detail/Bucket.inl"
-#include "samplesort/detail/GlobalCreateBst.inl"
-#include "samplesort/detail/GlobalFindBuckets.inl"
-#include "samplesort/detail/GlobalScatterElements.inl"
-#include "samplesort/detail/CTASampleSort.inl"
-#include "samplesort/detail/CTACopyBuckets.inl"
+#include "detail/constants.h"
+#include "detail/bucket.h"
+#include "detail/create_bst.h"
+#include "detail/find_buckets.h"
+#include "detail/scatter.h"
+#include "detail/quicksort.h"
+#include "detail/copy_buckets.h"
+#include "detail/temporary_device_memory.h"
 
 namespace SampleSort {
-    bool operator<(const Bucket &lhs, const Bucket &rhs) {
-        return rhs.size > lhs.size;
+
+    int clamp(int value, int lo, int hi) {
+        return std::max(lo, std::min(value, hi));
     }
 
     template<typename RandomAccessIterator1, typename RandomAccessIterator2, typename StrictWeakOrdering,
@@ -71,14 +74,14 @@ namespace SampleSort {
         const int LOCAL_THREADS = 256;
         const int COPY_THREADS = 128;
 
-        const int THREAD_MIN_ELEMS = 1;
         // The number of elements/thread is chosen so that at least this many CTAs are used, if possible.
         const int DESIRED_CTA_COUNT = numCTAs;
 
-        const int maxBlockCount = (1 << 16) - 1;
+        const size_t maxBlockCount = (1 << 16) - 1;
 
         typedef typename thrust::iterator_traits<RandomAccessIterator1>::value_type KeyType;
         typedef typename thrust::iterator_traits<RandomAccessIterator2>::value_type ValueType;
+        typedef typename StrictWeakOrdering CompType;
 
         KeyType *dKeys = thrust::raw_pointer_cast(&*keysBegin);
         ValueType *dValues = thrust::raw_pointer_cast(&*valuesBegin);
@@ -86,32 +89,21 @@ namespace SampleSort {
         const KeyType size = keysEnd - keysBegin;
         if (size == 0) return;
 
-        // For small inputs the maximum bucket size is decreased.
-        int minMaxBucketSize = 1 << 14;
-        // Below this size CTA level quick sort is used.
-        int maxBucketSize = 1 << 18;
-        // Adjust the maximum bucket size for small inputs.
-        maxBucketSize = std::min(maxBucketSize, (int) (size / (2 * std::sqrt((float) K))));
-        maxBucketSize = std::max(minMaxBucketSize, maxBucketSize);
+        const int maxBucketSize = clamp((int) size / (2 * std::sqrt((float) K)), 1 << 14, 1 << 18);
 
         std::stack<Bucket> largeBuckets;
-        std::vector<Bucket> curBuckets;
         // Buckets are ordered by size, which improves the performance of the
         // CTA level sorting. Helps the gpu's scheduler?
         std::priority_queue<Bucket> smallBuckets;
         std::priority_queue<Bucket> swappedBuckets;
 
         // Push the whole input on a stack.
-        Bucket init;
-        init.start = 0;
-        init.size = size;
-        init.flipped = false;
+        Bucket init(0, size);
 
         if (size < (unsigned int) maxBucketSize) smallBuckets.push(init);
         else largeBuckets.push(init);
 
-        KeyType *dKeysBuffer = 0;
-        cudaMalloc((void **) &dKeysBuffer, size * sizeof(KeyType));
+        TemporaryDeviceMemory<KeyType> keysBuffer(size);
 
         std::random_device rd;
         std::mt19937 gen(rd());
@@ -119,110 +111,83 @@ namespace SampleSort {
         std::uniform_int_distribution<int> distribution;
         Lrand48 *rng = new Lrand48();
 
-        ValueType *dValuesBuffer = 0;
-        if (!keysOnly) cudaMalloc((void **) &dValuesBuffer, size * sizeof(ValueType));
+        TemporaryDeviceMemory<ValueType> valuesBuffer(keysOnly ? size : 0);
 
         // Cooperatively k-way split large buckets. Search tree creation is done for several large buckets in parallel.
         while (!largeBuckets.empty()) {
             // Grab as many large buckets as possible, within the CTA count limitation for a kernel call.
-            curBuckets.clear();
+            std::vector<Bucket> buckets;
             int maxNumBlocks = 0;
-            while (!largeBuckets.empty() && curBuckets.size() < maxBlockCount) {
+            while (!largeBuckets.empty() && buckets.size() < maxBlockCount) {
                 Bucket b = largeBuckets.top();
 
                 // Adjust the number of elements/thread according to the bucket size.
-                int elementsPerThread = THREAD_MIN_ELEMS;
-                elementsPerThread = std::max(elementsPerThread,
-                                             (int) ceil((double) b.size / (DESIRED_CTA_COUNT * FIND_THREADS)));
+                int elementsPerThread = std::max(1, (int) ceil((double) b.size / (DESIRED_CTA_COUNT * FIND_THREADS)));
                 int bucketBlocks = (int) ceil(((double) b.size / (elementsPerThread * FIND_THREADS)));
 
                 b.elementsPerThread = elementsPerThread;
                 maxNumBlocks = std::max(maxNumBlocks, bucketBlocks);
-                curBuckets.push_back(b);
+                buckets.push_back(b);
                 largeBuckets.pop();
             }
 
             // Copy bucket parameters to the GPU.
-            const size_t numCurBuckets = curBuckets.size();
-            Bucket *bucketParams = new Bucket[numCurBuckets];
-            for (int i = 0; i < (int) curBuckets.size(); ++i)
-                bucketParams[i] = curBuckets[i];
-            Bucket *dBucketParams = 0;
-            cudaMalloc((void **) &dBucketParams, numCurBuckets * sizeof(Bucket));
-            cudaMemcpy(dBucketParams, bucketParams, numCurBuckets * sizeof(Bucket), cudaMemcpyHostToDevice);
+            TemporaryDeviceMemory<Bucket> devBucketParams(buckets.size());
+            devBucketParams.copy_to_device(buckets.data());
 
             // Create the binary search trees.
-            KeyType *dBst = 0;
-            KeyType *dSample = 0;
-            KeyType *dSampleBuffer = 0;
-            cudaMalloc((void **) &dBst, K * numCurBuckets * sizeof(KeyType));
+            TemporaryDeviceMemory<KeyType> bst(K * buckets.size());
 
-            rng->init(numCurBuckets * BST_THREADS, distribution(gen));
+            rng->init((int) buckets.size() * BST_THREADS, distribution(gen));
 
             // One CTA creates the search tree for one bucket. In the first step only
             // one multiprocessor will be occupied. If no bucket is larger than a certain size,
             // use less oversampling.
             if (maxBucketSize < SMALL_A_LIMIT) {
-                cudaMalloc((void **) &dSample, SMALL_A * K * numCurBuckets * sizeof(KeyType));
-                cudaMalloc((void **) &dSampleBuffer, SMALL_A * K * numCurBuckets * sizeof(KeyType));
-                globalCreateBst<KeyType, StrictWeakOrdering, K, SMALL_A, BST_THREADS, LOCAL_SORT_SIZE> << <
-                numCurBuckets,
-                        BST_THREADS >> > (dKeys, dKeysBuffer, dBucketParams, dBst, dSample, dSampleBuffer, *rng, comp);
+                TemporaryDeviceMemory<KeyType> sample(SMALL_A * K * buckets.size());
+                TemporaryDeviceMemory<KeyType> sampleBuffer(SMALL_A * K * buckets.size());
+                create_bst<KeyType, CompType, K, SMALL_A, BST_THREADS, LOCAL_SORT_SIZE> <<<buckets.size(), BST_THREADS>>>
+                        (dKeys, keysBuffer.data, devBucketParams.data, bst.data, sample.data, sampleBuffer.data, *rng, comp);
             } else {
-                cudaMalloc((void **) &dSample, LARGE_A * K * numCurBuckets * sizeof(KeyType));
-                cudaMalloc((void **) &dSampleBuffer, LARGE_A * K * numCurBuckets * sizeof(KeyType));
-                globalCreateBst<KeyType, StrictWeakOrdering, K, LARGE_A, BST_THREADS, LOCAL_SORT_SIZE> << <
-                numCurBuckets,
-                        BST_THREADS >> > (dKeys, dKeysBuffer, dBucketParams, dBst, dSample, dSampleBuffer, *rng, comp);
+                TemporaryDeviceMemory<KeyType> sample(LARGE_A * K * buckets.size());
+                TemporaryDeviceMemory<KeyType> sampleBuffer(LARGE_A * K * buckets.size());
+                create_bst<KeyType, CompType, K, LARGE_A, BST_THREADS, LOCAL_SORT_SIZE> <<<buckets.size(), BST_THREADS>>>
+                        (dKeys, keysBuffer.data, devBucketParams.data, bst.data, sample.data, sampleBuffer.data, *rng, comp);
             }
 
             rng->destroy();
-            cudaFree(dSample);
-            cudaFree(dSampleBuffer);
 
             // Fetch the bucket parameters again which now contain information about which buckets
             // have only equal splitters. Would be sufficient to just fetch an array of bool flags instead
             // of all parameters. But from profiling it looks as if that would be over-optimization.
-            cudaMemcpy(bucketParams, dBucketParams, numCurBuckets * sizeof(Bucket), cudaMemcpyDeviceToHost);
+            devBucketParams.copy_to_host(buckets.data());
 
-            int *dBucketCounters = 0;
-            cudaMalloc((void **) &dBucketCounters, K * COUNTERS * maxNumBlocks * sizeof(int));
+            TemporaryDeviceMemory<int> devBucketCounters((size_t) K * COUNTERS * maxNumBlocks);
 
-            int *newBucketBounds = new int[K * numCurBuckets];
-            int *dNewBucketBounds = 0;
-            cudaMalloc((void **) &dNewBucketBounds, K * numCurBuckets * sizeof(int));
+            std::vector<int> newBucketBounds(K * buckets.size());
+            TemporaryDeviceMemory<int> devNewBucketBounds(K * buckets.size());
 
             // Loop over the large buckets. The limit for considering a bucket to be large should ensure
             // that the bucket-finding and scattering kernels are launched with a sufficient number of CTAs
             // to make use of all available multiprocessors.
-            for (int i = 0; i < numCurBuckets; ++i) {
-                Bucket b = bucketParams[i];
-                KeyType *input;
-                KeyType *output;
-                ValueType *valuesInput;
-                ValueType *valuesOutput;
+            for (int i = 0; i < buckets.size(); ++i) {
+                Bucket b = buckets[i];
 
-                int numCurBucketCTAs = (int) ceil((double) b.size / (FIND_THREADS * b.elementsPerThread));
+                int blockCount = (int) ceil((double) b.size / (FIND_THREADS * b.elementsPerThread));
 
-                if (b.flipped) {
-                    input = dKeysBuffer;
-                    output = dKeys;
-                    valuesInput = dValuesBuffer;
-                    valuesOutput = dValues;
-                }
-                else {
-                    input = dKeys;
-                    output = dKeysBuffer;
-                    valuesInput = dValues;
-                    valuesOutput = dValuesBuffer;
-                }
+                int start = b.start;
+                int end = b.start + b.size;
 
-                cudaMemcpyToSymbol(bstCache, dBst + K * i, K * sizeof(KeyType), 0, cudaMemcpyDeviceToDevice);
+                KeyType *input = b.flipped ? keysBuffer.data : dKeys;
+                KeyType *output = b.flipped ? dKeys : keysBuffer.data;
+                ValueType *valuesInput = b.flipped ? valuesBuffer.data : dValues;
+                ValueType *valuesOutput = b.flipped ? dValues : valuesBuffer.data;
 
-                // If all keys in the sample are equal, we might be persuaded to assume that all keys in the bucket are equal.
-                // Two reductions tell us if this is the case.
+                cudaMemcpyToSymbol(bst_cache, bst.data + K * i, K * sizeof(KeyType), 0, cudaMemcpyDeviceToDevice);
+
+                // If all keys in the sample are equal, check if the whole bucket contains only one key.
                 if (b.degenerated) {
-                    thrust::device_ptr <KeyType> devInput(input + b.start);
+                    thrust::device_ptr <KeyType> devInput(input + start);
                     KeyType minKey, maxKey;
                     cudaMemcpy(&minKey, thrust::min_element(devInput, devInput + b.size).get(), sizeof(KeyType),
                                cudaMemcpyDeviceToHost);
@@ -230,81 +195,67 @@ namespace SampleSort {
                                cudaMemcpyDeviceToHost);
 
                     if (!comp(minKey, maxKey) && !comp(maxKey, minKey)) {
-                        bucketParams[i].constant = true;
-                        // Skip the bucket finding and scattering.
+                        buckets[i].constant = true;
+                        // Skip the rest, the bucket is already sorted.
                         continue;
                     }
                 }
 
                 // Find buckets.
                 if (!b.degenerated)
-                    globalFindBuckets<KeyType, StrictWeakOrdering, K, LOG_K, FIND_THREADS, COUNTERS, COUNTER_COPIES, false>
-                            << < numCurBucketCTAs, FIND_THREADS >> >
-                                                   (input, b.start, b.start +
-                                                                    b.size, dBucketCounters, b.elementsPerThread, comp);
+                    find_buckets<KeyType, CompType, K, LOG_K, FIND_THREADS, COUNTERS, COUNTER_COPIES, false>
+                            <<<blockCount, FIND_THREADS>>> (input, start, end, devBucketCounters.data, b.elementsPerThread, comp);
                 else
-                    globalFindBuckets<KeyType, StrictWeakOrdering, K, LOG_K, FIND_THREADS, COUNTERS, COUNTER_COPIES, true>
-                            << < numCurBucketCTAs, FIND_THREADS >> >
-                                                   (input, b.start, b.start +
-                                                                    b.size, dBucketCounters, b.elementsPerThread, comp);
+                    find_buckets<KeyType, CompType, K, LOG_K, FIND_THREADS, COUNTERS, COUNTER_COPIES, true>
+                            <<<blockCount, FIND_THREADS>>> (input, start, end, devBucketCounters.data, b.elementsPerThread, comp);
 
                 // Scan over the bucket counters, yielding the array positions the blocks of the scattering kernel need to write to.
-                thrust::device_ptr<int> devCounters(dBucketCounters);
-                thrust::inclusive_scan(devCounters, devCounters + K * COUNTERS * numCurBucketCTAs, devCounters);
+                thrust::device_ptr<int> devCounters(devBucketCounters.data);
+                thrust::inclusive_scan(devCounters, devCounters + K * COUNTERS * blockCount, devCounters);
 
                 // Scatter elements, extract bucket positions.
                 if (keysOnly) {
                     if (!b.degenerated)
-                        globalScatterElements<KeyType, StrictWeakOrdering, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, false>
-                                << < numCurBucketCTAs,
-                                SCATTER_THREADS >> >
-                                (input, b.start, b.start + b.size, output, dBucketCounters, dNewBucketBounds + K *
-                                                                                                               i, b.elementsPerThread, comp);
+                        scatter<KeyType, CompType, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, false>
+                                <<<blockCount, SCATTER_THREADS>>> (input, start, end, output, devBucketCounters.data, devNewBucketBounds.data +
+                                                                                    K * i, b.elementsPerThread, comp);
                     else
-                        globalScatterElements<KeyType, StrictWeakOrdering, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, true>
-                                << < numCurBucketCTAs,
-                                SCATTER_THREADS >> >
-                                (input, b.start, b.start + b.size, output, dBucketCounters, dNewBucketBounds + K *
-                                                                                                               i, b.elementsPerThread, comp);
+                        scatter<KeyType, CompType, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, true>
+                                <<<blockCount, SCATTER_THREADS >>> (input, start, end, output, devBucketCounters.data, devNewBucketBounds.data +
+                                                                                    K * i, b.elementsPerThread, comp);
                 } else {
                     if (!b.degenerated)
-                        globalScatterElementsKeyValue<KeyType, ValueType, StrictWeakOrdering, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, false>
-                                << < numCurBucketCTAs, SCATTER_THREADS >> > (input, valuesInput, b.start, b.start +
-                                                                                                          b.size, output, valuesOutput,
-                                dBucketCounters, dNewBucketBounds + K * i, b.elementsPerThread, comp);
+                        scatter<KeyType, ValueType, CompType, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, false>
+                                <<<blockCount, SCATTER_THREADS>>> (input, valuesInput, start, end, output, valuesOutput,
+                                                         devBucketCounters.data, devNewBucketBounds.data + K * i, b.elementsPerThread, comp);
                     else
-                        globalScatterElementsKeyValue<KeyType, ValueType, StrictWeakOrdering, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, true>
-                                << < numCurBucketCTAs, SCATTER_THREADS >> > (input, valuesInput, b.start, b.start +
-                                                                                                          b.size, output, valuesOutput,
-                                dBucketCounters, dNewBucketBounds + K * i, b.elementsPerThread, comp);
+                        scatter<KeyType, ValueType, CompType, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, true>
+                                <<<blockCount, SCATTER_THREADS>>> (input, valuesInput, start, end, output, valuesOutput,
+                                                         devBucketCounters.data, devNewBucketBounds.data + K * i, b.elementsPerThread, comp);
                 }
             }
 
             // Copy bucket positions and parameters to CPU, refill stack.
-            cudaMemcpy(newBucketBounds, dNewBucketBounds, K * numCurBuckets * sizeof(int), cudaMemcpyDeviceToHost);
+            devNewBucketBounds.copy_to_host(newBucketBounds.data());
 
-            for (int i = 0; i < numCurBuckets; i++) {
-                if (!bucketParams[i].degenerated) {
+            for (int i = 0; i < buckets.size(); i++) {
+                if (!buckets[i].degenerated) {
                     for (int j = 0; j < K; j++) {
-                        Bucket newBucket;
-
-                        newBucket.start = (j > 0) ? newBucketBounds[K * i + j - 1] : bucketParams[i].start;
-                        newBucket.size = newBucketBounds[K * i + j] - newBucket.start;
-                        newBucket.flipped = !bucketParams[i].flipped;
+                        int start = (j > 0) ? newBucketBounds[K * i + j - 1] : buckets[i].start;
+                        int bucketSize = newBucketBounds[K * i + j] - start;
+                        Bucket newBucket(start, bucketSize, !buckets[i].flipped);
 
                         // Depending on it's size push the bucket on a different stack.
                         if (newBucket.size > maxBucketSize) largeBuckets.push(newBucket);
                         else if (newBucket.size > 1) smallBuckets.push(newBucket);
                         else if (newBucket.size == 1 && newBucket.flipped) swappedBuckets.push(newBucket);
                     }
-                } else if (!bucketParams[i].constant) {
+                } else if (!buckets[i].constant) {
                     // There are only 3 buckets if all splitters were equal.
                     for (int j = 0; j < 3; j++) {
-                        Bucket newBucket;
-
-                        newBucket.start = (j > 0) ? newBucketBounds[K * i + j - 1] : bucketParams[i].start;
-                        newBucket.size = newBucketBounds[K * i + j] - newBucket.start;
-                        newBucket.flipped = !bucketParams[i].flipped;
+                        int start = (j > 0) ? newBucketBounds[K * i + j - 1] : buckets[i].start;
+                        int bucketSize = newBucketBounds[K * i + j] - start;
+                        Bucket newBucket(start, bucketSize, !buckets[i].flipped);
 
                         // Bucket with id 1 contains only equal keys, there is no need to sort it.
                         if (j == 1) {
@@ -315,125 +266,104 @@ namespace SampleSort {
                     }
                 } else {
                     // The bucket only contains equal keys. No need for sorting.
-                    if (bucketParams[i].flipped) swappedBuckets.push(bucketParams[i]);
+                    if (buckets[i].flipped) swappedBuckets.push(buckets[i]);
                 }
             }
-
-            // Clean up temporary data.
-            cudaFree(dNewBucketBounds);
-            cudaFree(dBucketCounters);
-            cudaFree(dBucketParams);
-            cudaFree(dBst);
-            delete[] newBucketBounds;
-            delete[] bucketParams;
         }
 
-        // Move the constant buckets from the buffer back to the input array. Do it in batches,
-        // if their number exceeds the CTA count limit for a kernel call.
-        int numSwappedBuckets = swappedBuckets.size();
-        Bucket *swappedBucketData = new Bucket[std::min(numSwappedBuckets, maxBlockCount)];
-        Bucket *dSwappedBucketData = 0;
-        cudaMalloc((void **) &dSwappedBucketData, std::min(numSwappedBuckets, maxBlockCount) * sizeof(Bucket));
+        {
+            // Move the constant buckets from the buffer back to the input array. Do it in batches,
+            // if their number exceeds the CTA count limit for a kernel call.
+            int batchSize = std::min(swappedBuckets.size(), maxBlockCount);
+            TemporaryDeviceMemory<Bucket> devSwappedBucketData((size_t) batchSize);
+            std::vector<Bucket> swappedBucketData;
 
-        while (numSwappedBuckets > 0) {
-            int batchSize = std::min(numSwappedBuckets, maxBlockCount);
-            numSwappedBuckets -= batchSize;
+            while (!swappedBuckets.empty()) {
+                swappedBucketData.clear();
+                batchSize = std::min(swappedBuckets.size(), maxBlockCount);
 
-            for (int i = 0; i < batchSize; ++i) {
-                swappedBucketData[i] = swappedBuckets.top();
-                swappedBuckets.pop();
+                for (int i = 0; i < batchSize; ++i) {
+                    swappedBucketData.push_back(swappedBuckets.top());
+                    swappedBuckets.pop();
+                }
+
+                devSwappedBucketData.copy_to_device(swappedBucketData.data());
+
+                if (keysOnly)
+                    copy_buckets<COPY_THREADS> <<<batchSize, COPY_THREADS>>>
+                                                               (dKeys, keysBuffer.data, devSwappedBucketData.data);
+                else
+                    copy_buckets<COPY_THREADS> <<<batchSize, COPY_THREADS>>>
+                                                               (dKeys, keysBuffer.data, dValues, valuesBuffer.data, devSwappedBucketData.data);
             }
-
-            cudaMemcpy(dSwappedBucketData, swappedBucketData, batchSize * sizeof(Bucket), cudaMemcpyHostToDevice);
-
-            if (keysOnly)
-                CTACopyBuckets<COPY_THREADS> << < batchSize, COPY_THREADS >> > (dKeys, dKeysBuffer, dSwappedBucketData);
-            else
-                CTACopyBucketsKeyValue<COPY_THREADS> << < batchSize, COPY_THREADS >> >
-                                                                     (dKeys, dKeysBuffer, dValues, dValuesBuffer, dSwappedBucketData);
         }
 
-        // Now sort the small buckets on the gpu. Again, do it in batches if necessary.
-        int numSmallBuckets = smallBuckets.size();
-        Bucket *smallBucketData = new Bucket[std::min(numSmallBuckets, maxBlockCount)];
-        Bucket *dSmallBucketData = 0;
-        cudaMalloc((void **) &dSmallBucketData, std::min(numSmallBuckets, maxBlockCount) * sizeof(Bucket));
+        {
+            // Now sort the small buckets on the gpu. Again, do it in batches if necessary.
+            int batchSize = std::min(smallBuckets.size(), maxBlockCount);
+            TemporaryDeviceMemory<Bucket> devSmallBucketData((size_t) batchSize);
+            std::vector<Bucket> smallBucketData;
 
-        while (numSmallBuckets > 0) {
-            int batchSize = std::min(numSmallBuckets, maxBlockCount);
-            numSmallBuckets -= batchSize;
+            while (!smallBuckets.empty()) {
+                smallBucketData.clear();
+                batchSize = std::min(smallBuckets.size(), maxBlockCount);
 
-            for (int i = 0; i < batchSize; ++i) {
-                smallBucketData[i] = smallBuckets.top();
-                smallBuckets.pop();
+                for (int i = 0; i < batchSize; ++i) {
+                    smallBucketData.push_back(smallBuckets.top());
+                    smallBuckets.pop();
+                }
+
+                devSmallBucketData.copy_to_device(smallBucketData.data());
+
+                if (keysOnly)
+                    quicksort<KeyType, CompType, LOCAL_SORT_SIZE, LOCAL_THREADS> <<<batchSize, LOCAL_THREADS>>>
+                            (dKeys, keysBuffer.data, devSmallBucketData.data, comp);
+                else
+                    quicksort<KeyType, ValueType, CompType, LOCAL_SORT_SIZE_KV, LOCAL_THREADS> <<<batchSize, LOCAL_THREADS>>>
+                            (dKeys, keysBuffer.data, dValues, valuesBuffer.data, devSmallBucketData.data, comp);
             }
-
-            cudaMemcpy(dSmallBucketData, smallBucketData, batchSize * sizeof(Bucket), cudaMemcpyHostToDevice);
-
-            rng->init(LOCAL_THREADS, distribution(gen));
-
-            if (keysOnly)
-                CTASampleSort<KeyType, StrictWeakOrdering, LOCAL_SORT_SIZE, LOCAL_THREADS> << < batchSize,
-                        LOCAL_THREADS >> > (dKeys,
-                                dKeysBuffer, dSmallBucketData, *rng, comp);
-            else
-                CTASampleSortKeyValue<KeyType, ValueType, StrictWeakOrdering, LOCAL_SORT_SIZE, LOCAL_THREADS> << <
-                batchSize, LOCAL_THREADS >> > (dKeys,
-                        dKeysBuffer, dValues, dValuesBuffer, dSmallBucketData, *rng, comp);
-
-            rng->destroy();
         }
 
         // Clean up.
         delete rng;
-        delete[] swappedBucketData;
-        delete[] smallBucketData;
-        cudaFree(dSwappedBucketData);
-        cudaFree(dSmallBucketData);
-        cudaFree(dKeysBuffer);
-
-        if (!keysOnly) cudaFree(dValuesBuffer);
     }
 
     template<typename KeyType, typename ValueType>
-    void sortTempl(KeyType *keys, KeyType *keysEnd, ValueType *values = 0) {
+    void sortTemplate(KeyType *keys, KeyType *keysEnd, ValueType *values = 0) {
         const unsigned int A = 32;
         // Below this size odd-even-merge-sort is used in the CTA sort.
         const unsigned int LOCAL_SORT_SIZE = 2048;
         // Might want to choose a different size for key-value sorting, since the
         // shared memory requirements are higher
-        const unsigned int LOCAL_SORT_SIZE_KV = 1784;
+        const unsigned int LOCAL_SORT_SIZE_KV = 2048;
 
         thrust::less <KeyType> comp;
 
         SampleSort::sort<KeyType *, ValueType *, thrust::less < KeyType>,
-                A, LOCAL_SORT_SIZE, LOCAL_SORT_SIZE_KV > (keys, keysEnd, values, comp, values == 0, 400);
+                A, LOCAL_SORT_SIZE, LOCAL_SORT_SIZE_KV > (keys, keysEnd, values, comp, values == 0, 512);
     }
 
     void sort_by_key(std::uint16_t *keys, std::uint16_t *keysEnd, std::uint64_t *values) {
-        sortTempl<std::uint16_t, std::uint64_t>(keys, keysEnd, values);
+        sortTemplate<std::uint16_t, std::uint64_t>(keys, keysEnd, values);
     }
 
     void sort_by_key(std::uint32_t *keys, std::uint32_t *keysEnd, std::uint64_t *values) {
-        sortTempl<std::uint32_t, std::uint64_t>(keys, keysEnd, values);
+        sortTemplate<std::uint32_t, std::uint64_t>(keys, keysEnd, values);
     }
 
     void sort_by_key(std::uint64_t *keys, std::uint64_t *keysEnd, std::uint64_t *values) {
-        sortTempl<std::uint64_t, std::uint64_t>(keys, keysEnd, values);
+        sortTemplate<std::uint64_t, std::uint64_t>(keys, keysEnd, values);
     }
 
     void sort(std::uint16_t *keys, std::uint16_t *keysEnd) {
-        sortTempl<std::uint16_t, std::uint16_t>(keys, keysEnd, 0);
+        sortTemplate<std::uint16_t, std::uint16_t>(keys, keysEnd, 0);
     }
 
     void sort(std::uint32_t *keys, std::uint32_t *keysEnd) {
-        sortTempl<std::uint32_t, std::uint32_t>(keys, keysEnd, 0);
+        sortTemplate<std::uint32_t, std::uint32_t>(keys, keysEnd, 0);
     }
 
     void sort(std::uint64_t *keys, std::uint64_t *keysEnd) {
-        sortTempl<std::uint64_t, std::uint64_t>(keys, keysEnd, 0);
+        sortTemplate<std::uint64_t, std::uint64_t>(keys, keysEnd, 0);
     }
 }
-
-
-

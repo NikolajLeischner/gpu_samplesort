@@ -43,7 +43,7 @@ namespace Distributions {
     }
 
     template<typename T>
-    const T* Distribution<T>::begin() const {
+    const T *Distribution<T>::begin() const {
         return content.data();
     }
 
@@ -53,7 +53,7 @@ namespace Distributions {
     }
 
     template<typename T>
-    const T* Distribution<T>::end() const {
+    const T *Distribution<T>::end() const {
         return content.data() + size();
     }
 
@@ -127,9 +127,7 @@ namespace Distributions {
 
     template<typename T>
     Distribution<T> zero(std::uint64_t size) {
-        std::vector<T> content(size);
-        std::fill(content.begin(), content.end(), 0);
-        return Distribution<T>(content);
+        return Distribution<T>(std::vector<T>(size, 0));
     }
 
 
