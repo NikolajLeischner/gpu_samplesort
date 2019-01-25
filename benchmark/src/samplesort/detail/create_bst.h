@@ -1,7 +1,7 @@
 /**
 * GPU Sample Sort
 * -----------------------
-* Copyright (c) 2009-2010 Nikolaj Leischner and Vitaly Osipov
+* Copyright (c) 2009-2019 Nikolaj Leischner and Vitaly Osipov
 *
 * Permission is hereby granted, free of charge, to any person
 * obtaining a copy of this software and associated documentation
@@ -34,7 +34,7 @@
 
 namespace SampleSort {
     // For each CTA, sort a random sample of it's part of the input sequence and create a binary search tree.
-    template<typename KeyType, typename CompType, int K, int A, unsigned int CTA_SIZE, unsigned int LOCAL_SORT_SIZE>
+    template<int K, int A, unsigned int CTA_SIZE, unsigned int LOCAL_SORT_SIZE, typename KeyType, typename CompType>
     __global__ static void create_bst(KeyType *keysIn, KeyType *keysOut, struct Bucket *bucketParams,
                                       KeyType *bst, KeyType *sample, KeyType *sampleBuffer, Lrand48 rng,
                                       CompType comp) {

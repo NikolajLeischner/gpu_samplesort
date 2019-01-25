@@ -1,7 +1,7 @@
 /**
 * GPU Sample Sort
 * -----------------------
-* Copyright (c) 2009-2010 Nikolaj Leischner and Vitaly Osipov
+* Copyright (c) 2009-2019 Nikolaj Leischner and Vitaly Osipov
 *
 * Permission is hereby granted, free of charge, to any person
 * obtaining a copy of this software and associated documentation
@@ -24,6 +24,7 @@
 * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 * OTHER DEALINGS IN THE SOFTWARE.
 **/
+
 #include <iostream>
 #include <algorithm>
 #include <stack>
@@ -53,10 +54,71 @@ namespace SampleSort {
         return std::max(lo, std::min(value, hi));
     }
 
-    template<typename RandomAccessIterator1, typename RandomAccessIterator2, typename StrictWeakOrdering,
-            unsigned int A, unsigned int LOCAL_SORT_SIZE, unsigned int LOCAL_SORT_SIZE_KV>
+    template<int COPY_THREADS, size_t MAX_BLOCK_COUNT, bool KEYS_ONLY, typename KeyType, typename ValueType>
+    void move_to_output(std::priority_queue<Bucket> &swappedBuckets, KeyType *dKeys,
+            const TemporaryDeviceMemory<KeyType> &keysBuffer, ValueType *dValues,
+            const TemporaryDeviceMemory<ValueType> &valuesBuffer) {
+        int batchSize = std::min(swappedBuckets.size(), MAX_BLOCK_COUNT);
+        TemporaryDeviceMemory<Bucket> devSwappedBucketData((size_t) batchSize);
+        std::vector<Bucket> swappedBucketData;
+
+        while (!swappedBuckets.empty()) {
+            swappedBucketData.clear();
+            batchSize = std::min(swappedBuckets.size(), MAX_BLOCK_COUNT);
+
+            for (int i = 0; i < batchSize; ++i) {
+                swappedBucketData.push_back(swappedBuckets.top());
+                swappedBuckets.pop();
+            }
+
+            devSwappedBucketData.copy_to_device(swappedBucketData.data());
+
+            if (KEYS_ONLY)
+                copy_buckets<COPY_THREADS> <<<batchSize, COPY_THREADS>>>
+                        (dKeys, keysBuffer.data, devSwappedBucketData.data);
+            else
+                copy_buckets<COPY_THREADS> <<<batchSize, COPY_THREADS>>>
+                        (dKeys, keysBuffer.data, dValues, valuesBuffer.data, devSwappedBucketData.data);
+        }
+    }
+
+    template<int SORT_THREADS, size_t MAX_BLOCK_COUNT, bool KEYS_ONLY, typename KeyType, typename ValueType, typename CompType>
+    void sort_buckets(std::priority_queue<Bucket> &smallBuckets, KeyType *dKeys,
+                        const TemporaryDeviceMemory<KeyType> &keysBuffer, ValueType *dValues,
+                        const TemporaryDeviceMemory<ValueType> &valuesBuffer, CompType comp) {
+        // Below this size odd-even-merge-sort is used in the CTA sort.
+        const unsigned int LOCAL_SORT_SIZE = 2048;
+        // Might want to choose a different size for key-value sorting, since the
+        // shared memory requirements are higher.
+        const unsigned int LOCAL_SORT_SIZE_KV = 2048;
+        int batchSize = std::min(smallBuckets.size(), MAX_BLOCK_COUNT);
+        TemporaryDeviceMemory<Bucket> devSmallBucketData((size_t) batchSize);
+        std::vector<Bucket> smallBucketData;
+
+        while (!smallBuckets.empty()) {
+            smallBucketData.clear();
+            batchSize = std::min(smallBuckets.size(), MAX_BLOCK_COUNT);
+
+            for (int i = 0; i < batchSize; ++i) {
+                smallBucketData.push_back(smallBuckets.top());
+                smallBuckets.pop();
+            }
+
+            devSmallBucketData.copy_to_device(smallBucketData.data());
+
+            if (KEYS_ONLY)
+                quicksort<LOCAL_SORT_SIZE, SORT_THREADS> <<<batchSize, SORT_THREADS>>>
+                        (dKeys, keysBuffer.data, devSmallBucketData.data, comp);
+            else
+                quicksort<LOCAL_SORT_SIZE_KV, SORT_THREADS> <<<batchSize, SORT_THREADS>>>
+                        (dKeys, keysBuffer.data, dValues, valuesBuffer.data, devSmallBucketData.data, comp);
+        }
+    }
+
+    template<typename RandomAccessIterator1, typename RandomAccessIterator2, typename StrictWeakOrdering, bool KEYS_ONLY>
     void sort(RandomAccessIterator1 keysBegin, RandomAccessIterator1 keysEnd,
-              RandomAccessIterator2 valuesBegin, StrictWeakOrdering comp, bool keysOnly, int numCTAs) {
+              RandomAccessIterator2 valuesBegin, StrictWeakOrdering comp) {
+        const unsigned int A = 32;
         const int LARGE_A = A;
         // Smaller oversampling factor, used when all buckets are smaller than some size.
         const int SMALL_A = A / 2;
@@ -67,6 +129,7 @@ namespace SampleSort {
         // Factor for additional counter replication in the bucket finding kernel.
         const int COUNTER_COPIES = 1;
 
+        const unsigned int LOCAL_SORT_SIZE = 2048;
         const int BST_THREADS = 128;
         const int FIND_THREADS = 128;
         const int SCATTER_THREADS = 128;
@@ -75,9 +138,9 @@ namespace SampleSort {
         const int COPY_THREADS = 128;
 
         // The number of elements/thread is chosen so that at least this many CTAs are used, if possible.
-        const int DESIRED_CTA_COUNT = numCTAs;
+        const int DESIRED_CTA_COUNT = 1024;
 
-        const size_t maxBlockCount = (1 << 16) - 1;
+        const size_t MAX_BLOCK_COUNT = (1 << 29) - 1;
 
         typedef typename thrust::iterator_traits<RandomAccessIterator1>::value_type KeyType;
         typedef typename thrust::iterator_traits<RandomAccessIterator2>::value_type ValueType;
@@ -111,14 +174,14 @@ namespace SampleSort {
         std::uniform_int_distribution<int> distribution;
         Lrand48 *rng = new Lrand48();
 
-        TemporaryDeviceMemory<ValueType> valuesBuffer(keysOnly ? size : 0);
+        TemporaryDeviceMemory<ValueType> valuesBuffer(KEYS_ONLY ? size : 0);
 
         // Cooperatively k-way split large buckets. Search tree creation is done for several large buckets in parallel.
         while (!largeBuckets.empty()) {
             // Grab as many large buckets as possible, within the CTA count limitation for a kernel call.
             std::vector<Bucket> buckets;
             int maxNumBlocks = 0;
-            while (!largeBuckets.empty() && buckets.size() < maxBlockCount) {
+            while (!largeBuckets.empty() && buckets.size() < MAX_BLOCK_COUNT) {
                 Bucket b = largeBuckets.top();
 
                 // Adjust the number of elements/thread according to the bucket size.
@@ -146,12 +209,12 @@ namespace SampleSort {
             if (maxBucketSize < SMALL_A_LIMIT) {
                 TemporaryDeviceMemory<KeyType> sample(SMALL_A * K * buckets.size());
                 TemporaryDeviceMemory<KeyType> sampleBuffer(SMALL_A * K * buckets.size());
-                create_bst<KeyType, CompType, K, SMALL_A, BST_THREADS, LOCAL_SORT_SIZE> <<<buckets.size(), BST_THREADS>>>
+                create_bst<K, SMALL_A, BST_THREADS, LOCAL_SORT_SIZE> <<<buckets.size(), BST_THREADS>>>
                         (dKeys, keysBuffer.data, devBucketParams.data, bst.data, sample.data, sampleBuffer.data, *rng, comp);
             } else {
                 TemporaryDeviceMemory<KeyType> sample(LARGE_A * K * buckets.size());
                 TemporaryDeviceMemory<KeyType> sampleBuffer(LARGE_A * K * buckets.size());
-                create_bst<KeyType, CompType, K, LARGE_A, BST_THREADS, LOCAL_SORT_SIZE> <<<buckets.size(), BST_THREADS>>>
+                create_bst<K, LARGE_A, BST_THREADS, LOCAL_SORT_SIZE> <<<buckets.size(), BST_THREADS>>>
                         (dKeys, keysBuffer.data, devBucketParams.data, bst.data, sample.data, sampleBuffer.data, *rng, comp);
             }
 
@@ -203,39 +266,37 @@ namespace SampleSort {
 
                 // Find buckets.
                 if (!b.degenerated)
-                    find_buckets<KeyType, CompType, K, LOG_K, FIND_THREADS, COUNTERS, COUNTER_COPIES, false>
+                    find_buckets<K, LOG_K, FIND_THREADS, COUNTERS, COUNTER_COPIES, false>
                             <<<blockCount, FIND_THREADS>>> (input, start, end, devBucketCounters.data, b.elementsPerThread, comp);
                 else
-                    find_buckets<KeyType, CompType, K, LOG_K, FIND_THREADS, COUNTERS, COUNTER_COPIES, true>
+                    find_buckets<K, LOG_K, FIND_THREADS, COUNTERS, COUNTER_COPIES, true>
                             <<<blockCount, FIND_THREADS>>> (input, start, end, devBucketCounters.data, b.elementsPerThread, comp);
 
                 // Scan over the bucket counters, yielding the array positions the blocks of the scattering kernel need to write to.
                 thrust::device_ptr<int> devCounters(devBucketCounters.data);
                 thrust::inclusive_scan(devCounters, devCounters + K * COUNTERS * blockCount, devCounters);
 
-                // Scatter elements, extract bucket positions.
-                if (keysOnly) {
+                if (KEYS_ONLY) {
                     if (!b.degenerated)
-                        scatter<KeyType, CompType, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, false>
-                                <<<blockCount, SCATTER_THREADS>>> (input, start, end, output, devBucketCounters.data, devNewBucketBounds.data +
-                                                                                    K * i, b.elementsPerThread, comp);
+                        scatter<K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, false>
+                                <<<blockCount, SCATTER_THREADS>>> (input, start, end, output, devBucketCounters.data,
+                                        devNewBucketBounds.data + K * i, b.elementsPerThread, comp);
                     else
-                        scatter<KeyType, CompType, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, true>
-                                <<<blockCount, SCATTER_THREADS >>> (input, start, end, output, devBucketCounters.data, devNewBucketBounds.data +
-                                                                                    K * i, b.elementsPerThread, comp);
+                        scatter<K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, true>
+                                <<<blockCount, SCATTER_THREADS >>> (input, start, end, output, devBucketCounters.data,
+                                        devNewBucketBounds.data + K * i, b.elementsPerThread, comp);
                 } else {
                     if (!b.degenerated)
-                        scatter<KeyType, ValueType, CompType, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, false>
+                        scatter<K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, false>
                                 <<<blockCount, SCATTER_THREADS>>> (input, valuesInput, start, end, output, valuesOutput,
-                                                         devBucketCounters.data, devNewBucketBounds.data + K * i, b.elementsPerThread, comp);
+                                        devBucketCounters.data, devNewBucketBounds.data + K * i, b.elementsPerThread, comp);
                     else
-                        scatter<KeyType, ValueType, CompType, K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, true>
+                        scatter<K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, true>
                                 <<<blockCount, SCATTER_THREADS>>> (input, valuesInput, start, end, output, valuesOutput,
-                                                         devBucketCounters.data, devNewBucketBounds.data + K * i, b.elementsPerThread, comp);
+                                        devBucketCounters.data, devNewBucketBounds.data + K * i, b.elementsPerThread, comp);
                 }
             }
 
-            // Copy bucket positions and parameters to CPU, refill stack.
             devNewBucketBounds.copy_to_host(newBucketBounds.data());
 
             for (int i = 0; i < buckets.size(); i++) {
@@ -270,100 +331,42 @@ namespace SampleSort {
                 }
             }
         }
-
-        {
-            // Move the constant buckets from the buffer back to the input array. Do it in batches,
-            // if their number exceeds the CTA count limit for a kernel call.
-            int batchSize = std::min(swappedBuckets.size(), maxBlockCount);
-            TemporaryDeviceMemory<Bucket> devSwappedBucketData((size_t) batchSize);
-            std::vector<Bucket> swappedBucketData;
-
-            while (!swappedBuckets.empty()) {
-                swappedBucketData.clear();
-                batchSize = std::min(swappedBuckets.size(), maxBlockCount);
-
-                for (int i = 0; i < batchSize; ++i) {
-                    swappedBucketData.push_back(swappedBuckets.top());
-                    swappedBuckets.pop();
-                }
-
-                devSwappedBucketData.copy_to_device(swappedBucketData.data());
-
-                if (keysOnly)
-                    copy_buckets<COPY_THREADS> <<<batchSize, COPY_THREADS>>>
-                                                               (dKeys, keysBuffer.data, devSwappedBucketData.data);
-                else
-                    copy_buckets<COPY_THREADS> <<<batchSize, COPY_THREADS>>>
-                                                               (dKeys, keysBuffer.data, dValues, valuesBuffer.data, devSwappedBucketData.data);
-            }
-        }
-
-        {
-            // Now sort the small buckets on the gpu. Again, do it in batches if necessary.
-            int batchSize = std::min(smallBuckets.size(), maxBlockCount);
-            TemporaryDeviceMemory<Bucket> devSmallBucketData((size_t) batchSize);
-            std::vector<Bucket> smallBucketData;
-
-            while (!smallBuckets.empty()) {
-                smallBucketData.clear();
-                batchSize = std::min(smallBuckets.size(), maxBlockCount);
-
-                for (int i = 0; i < batchSize; ++i) {
-                    smallBucketData.push_back(smallBuckets.top());
-                    smallBuckets.pop();
-                }
-
-                devSmallBucketData.copy_to_device(smallBucketData.data());
-
-                if (keysOnly)
-                    quicksort<KeyType, CompType, LOCAL_SORT_SIZE, LOCAL_THREADS> <<<batchSize, LOCAL_THREADS>>>
-                            (dKeys, keysBuffer.data, devSmallBucketData.data, comp);
-                else
-                    quicksort<KeyType, ValueType, CompType, LOCAL_SORT_SIZE_KV, LOCAL_THREADS> <<<batchSize, LOCAL_THREADS>>>
-                            (dKeys, keysBuffer.data, dValues, valuesBuffer.data, devSmallBucketData.data, comp);
-            }
-        }
-
-        // Clean up.
         delete rng;
-    }
 
-    template<typename KeyType, typename ValueType>
-    void sortTemplate(KeyType *keys, KeyType *keysEnd, ValueType *values = 0) {
-        const unsigned int A = 32;
-        // Below this size odd-even-merge-sort is used in the CTA sort.
-        const unsigned int LOCAL_SORT_SIZE = 2048;
-        // Might want to choose a different size for key-value sorting, since the
-        // shared memory requirements are higher
-        const unsigned int LOCAL_SORT_SIZE_KV = 2048;
+        move_to_output<COPY_THREADS, MAX_BLOCK_COUNT, KEYS_ONLY>
+                (swappedBuckets, dKeys, keysBuffer, dValues, valuesBuffer);
 
-        thrust::less <KeyType> comp;
-
-        SampleSort::sort<KeyType *, ValueType *, thrust::less < KeyType>,
-                A, LOCAL_SORT_SIZE, LOCAL_SORT_SIZE_KV > (keys, keysEnd, values, comp, values == 0, 512);
+        sort_buckets<LOCAL_THREADS, MAX_BLOCK_COUNT, KEYS_ONLY>
+                (smallBuckets, dKeys, keysBuffer, dValues, valuesBuffer, comp);
     }
 
     void sort_by_key(std::uint16_t *keys, std::uint16_t *keysEnd, std::uint64_t *values) {
-        sortTemplate<std::uint16_t, std::uint64_t>(keys, keysEnd, values);
+        SampleSort::sort<std::uint16_t *, std::uint64_t *, thrust::less<std::uint16_t>, false>
+                (keys, keysEnd, values, thrust::less<std::uint16_t>());
     }
 
     void sort_by_key(std::uint32_t *keys, std::uint32_t *keysEnd, std::uint64_t *values) {
-        sortTemplate<std::uint32_t, std::uint64_t>(keys, keysEnd, values);
+        SampleSort::sort<std::uint32_t *, std::uint64_t *, thrust::less<std::uint32_t>, false>
+                (keys, keysEnd, values, thrust::less<std::uint32_t>());
     }
 
     void sort_by_key(std::uint64_t *keys, std::uint64_t *keysEnd, std::uint64_t *values) {
-        sortTemplate<std::uint64_t, std::uint64_t>(keys, keysEnd, values);
+        SampleSort::sort<std::uint64_t *, std::uint64_t *, thrust::less<std::uint64_t>, false>
+                (keys, keysEnd, values, thrust::less<std::uint64_t>());
     }
 
     void sort(std::uint16_t *keys, std::uint16_t *keysEnd) {
-        sortTemplate<std::uint16_t, std::uint16_t>(keys, keysEnd, 0);
+        SampleSort::sort<std::uint16_t *, std::uint16_t *, thrust::less<std::uint16_t>, true>
+                (keys, keysEnd, 0, thrust::less<std::uint16_t>());
     }
 
     void sort(std::uint32_t *keys, std::uint32_t *keysEnd) {
-        sortTemplate<std::uint32_t, std::uint32_t>(keys, keysEnd, 0);
+        SampleSort::sort<std::uint32_t *, std::uint32_t *, thrust::less<std::uint32_t>, true>
+                (keys, keysEnd, 0, thrust::less<std::uint32_t>());
     }
 
     void sort(std::uint64_t *keys, std::uint64_t *keysEnd) {
-        sortTemplate<std::uint64_t, std::uint64_t>(keys, keysEnd, 0);
+        SampleSort::sort<std::uint64_t *, std::uint64_t *, thrust::less<std::uint64_t>, true>
+                (keys, keysEnd, 0, thrust::less<std::uint64_t>());
     }
 }

@@ -1,7 +1,7 @@
 /**
 * GPU Sample Sort
 * -----------------------
-* Copyright (c) 2009-2010 Nikolaj Leischner and Vitaly Osipov
+* Copyright (c) 2009-2019 Nikolaj Leischner and Vitaly Osipov
 *
 * Permission is hereby granted, free of charge, to any person
 * obtaining a copy of this software and associated documentation
@@ -33,12 +33,13 @@ namespace SampleSort {
     // to one CTA in the bucket finding kernel, although the number of threads per CTA may differ.
     // Note that the bucket ids have to be generated again. This is faster than storing them in global
     // memory and reading them here again, and avoids memory overhead.
-    template<typename KeyType, typename CompType, int K, int LOG_K, int FIND_THREADS, int CTA_SIZE, int COUNTERS, bool DEGENERATED>
+    // Bucket-finding & scattering must use the same number of elements per thread.
+    template<int K, int LOG_K, int FIND_THREADS, int CTA_SIZE, int COUNTERS, bool DEGENERATED, typename KeyType, typename CompType>
     __global__ void scatter(const KeyType *__restrict__ keysInput, int minPos, int maxPos,
-                                          KeyType *__restrict__ keysOutput,
-                                          const int *__restrict__ globalBuckets, int *__restrict__ newBucketBounds,
-                                          int keysPerThread, // The number of keys each thread processes. I.e. the number of CTAs required for buckets of
-            // different sizes can be adjusted. For one bucket the bucket-finding and scattering kernel must use the same value.
+                            KeyType *__restrict__ keysOutput,
+                            const int *__restrict__ globalBuckets,
+                            int *__restrict__ newBucketBounds,
+                            int keysPerThread,
                             CompType comp) {
         const int from = blockIdx.x * keysPerThread * FIND_THREADS + minPos;
         const int to = blockIdx.x + 1 == gridDim.x ? maxPos : from + keysPerThread * FIND_THREADS;
@@ -57,8 +58,7 @@ namespace SampleSort {
                 buckets[j] = globalBuckets[j - 1];
         }
 
-        __shared__
-        KeyType bst[K];
+        __shared__ KeyType bst[K];
 
         KeyType *constBst = reinterpret_cast<KeyType *>(bst_cache);
 
@@ -97,13 +97,13 @@ namespace SampleSort {
     }
 
     // Same as above but for key-value-pairs.
-    template<typename KeyType, typename ValueType, typename CompType, int K, int LOG_K, int FIND_THREADS, int CTA_SIZE, int COUNTERS, bool DEGENERATED>
+    template<int K, int LOG_K, int FIND_THREADS, int CTA_SIZE, int COUNTERS, bool DEGENERATED, typename KeyType, typename ValueType, typename CompType>
     __global__ void
     scatter(const KeyType *__restrict__ keysInput, const ValueType *__restrict__ valuesInput,
-                                  int minPos,
-                                  int maxPos, KeyType *__restrict__ keysOutput, ValueType *__restrict__ valuesOutput,
-                                  const int *__restrict__ globalBuckets, int *__restrict__ newBucketBounds,
-                                  int keysPerThread, CompType comp) {
+            int minPos,
+            int maxPos, KeyType *__restrict__ keysOutput, ValueType *__restrict__ valuesOutput,
+            const int *__restrict__ globalBuckets, int *__restrict__ newBucketBounds,
+            int keysPerThread, CompType comp) {
         const int from = blockIdx.x * keysPerThread * FIND_THREADS + minPos;
         const int to = blockIdx.x + 1 == gridDim.x ? maxPos : from + keysPerThread * FIND_THREADS;
 
@@ -122,10 +122,8 @@ namespace SampleSort {
         }
 
         // Shared memory copy of the search tree.
-        __shared__
-        KeyType bst[K];
-        __shared__
-        KeyType splitter;
+        __shared__ KeyType bst[K];
+        __shared__ KeyType splitter;
 
         KeyType *constBst = reinterpret_cast<KeyType *>(bst_cache);
 

@@ -1,16 +1,13 @@
-#include <utility>
-
-#include <utility>
-
 #pragma once
 
+#include <utility>
 #include <algorithm>
 #include <iostream>
+#include <map>
 #include <math.h>
 #include <tclap/CmdLine.h>
 #include "distributions.h"
 #include "keytype.h"
-#include <map>
 
 namespace Benchmark {
     namespace Algorithm {

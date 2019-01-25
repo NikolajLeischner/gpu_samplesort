@@ -1,7 +1,7 @@
 /**
 * GPU Sample Sort
 * -----------------------
-* Copyright (c) 2009-2010 Nikolaj Leischner and Vitaly Osipov
+* Copyright (c) 2009-2019 Nikolaj Leischner and Vitaly Osipov
 *
 * Permission is hereby granted, free of charge, to any person
 * obtaining a copy of this software and associated documentation
@@ -35,7 +35,7 @@ namespace SampleSort {
     // small sequences. Based on the GPU quicksort implementation by Daniel Cederman and Philippas Tsigas.
     // Like the original implementation the code tries to obey the memory coalescing rules for the G80
     // architecture. In this case doing so also improves performance on the G200 architecture.
-    template<typename KeyType, typename CompType, int LOCAL_SORT_SIZE, unsigned int CTA_SIZE>
+    template<int LOCAL_SORT_SIZE, unsigned int CTA_SIZE, typename KeyType, typename CompType>
     __global__ static void quicksort(KeyType *keysInput, KeyType *keysBuffer, const struct Bucket *bucketParams,
                                      CompType comp) {
         const int sharedSize = LOCAL_SORT_SIZE < 2 * CTA_SIZE ? 2 * CTA_SIZE : LOCAL_SORT_SIZE;
@@ -229,7 +229,7 @@ namespace SampleSort {
     }
 
     // Same as above but for key-value-pairs.
-    template<typename KeyType, typename ValueType, typename CompType, int LOCAL_SORT_SIZE, unsigned int CTA_SIZE>
+    template<int LOCAL_SORT_SIZE, unsigned int CTA_SIZE, typename KeyType, typename ValueType, typename CompType>
     __global__ static void quicksort(KeyType *keysInput, KeyType *keysBuffer, ValueType *valuesInput,
                                      ValueType *valuesBuffer, struct Bucket *bucketParams,
                                      CompType comp) {
