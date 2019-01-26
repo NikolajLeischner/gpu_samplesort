@@ -34,7 +34,7 @@
 
 namespace SampleSort {
     // For each CTA, sort a random sample of it's part of the input sequence and create a binary search tree.
-    template<int K, int A, unsigned int CTA_SIZE, unsigned int LOCAL_SORT_SIZE, typename KeyType, typename CompType>
+    template<int K, int A, int CTA_SIZE, int LOCAL_SORT_SIZE, typename KeyType, typename CompType>
     __global__ static void create_bst(KeyType *keysIn, KeyType *keysOut, struct Bucket *bucketParams,
                                       KeyType *bst, KeyType *sample, KeyType *sampleBuffer, Lrand48 rng,
                                       CompType comp) {

@@ -32,8 +32,8 @@ namespace SampleSort {
     // offsets for scattering a prefix sum has to be performed afterwards.
     // Bucket-finding & scattering must use the same number of elements per thread.
     template<int K, int LOG_K, int CTA_SIZE, int COUNTERS, int COUNTER_COPIES, bool DEGENERATED, typename KeyType, typename CompType>
-    __global__ static void find_buckets(KeyType *keys, int minPos, int maxPos, int *globalBuckets,
-                                        int elementsPerThread,
+    __global__ static void find_buckets(KeyType *keys, int min_pos, int max_pos, int *global_buckets,
+                                        int keys_per_thread,
                                         CompType comp) {
         const int LOCAL_COUNTERS = COUNTERS * COUNTER_COPIES;
         // This reduces register usage.
@@ -45,42 +45,42 @@ namespace SampleSort {
         }
         __syncthreads();
 
-        const int findBlockElements = elementsPerThread * CTA_SIZE;
-        const int from = block * findBlockElements + minPos;
-        int to = (block + 1 == grid) ? maxPos : from + findBlockElements;
+        const int block_element_count = keys_per_thread * CTA_SIZE;
+        const int from = block * block_element_count + min_pos;
+        int to = (block + 1 == grid) ? max_pos : from + block_element_count;
 
-        __shared__  KeyType bst[K];
+        __shared__ KeyType bst[K];
         __shared__ int buckets[K * LOCAL_COUNTERS];
 
-        KeyType *constBst = reinterpret_cast<KeyType *>(bst_cache);
+        KeyType *const_bst = reinterpret_cast<KeyType *>(bst_cache);
 
         for (int i = threadIdx.x; i < K * LOCAL_COUNTERS; i += CTA_SIZE) buckets[i] = 0;
 
         if (!DEGENERATED) {
-            for (int i = threadIdx.x; i < K; i += CTA_SIZE) bst[i] = constBst[i];
+            for (int i = threadIdx.x; i < K; i += CTA_SIZE) bst[i] = const_bst[i];
         }
             // All splitters for the bucket are identical, don't even load the bst but just one splitter.
-        else if (threadIdx.x == 0) bst[0] = constBst[0];
+        else if (threadIdx.x == 0) bst[0] = const_bst[0];
         __syncthreads();
 
         for (int i = from + threadIdx.x; i < to; i += CTA_SIZE) {
-            int bucketPos = 1;
+            int bucket_pos = 1;
             KeyType d = keys[i];
 
             if (!DEGENERATED) {
                 // Traverse bst.
                 for (int j = 0; j < LOG_K; ++j) {
-                    if (comp(bst[bucketPos - 1], d)) bucketPos = (bucketPos << 1) + 1;
-                    else bucketPos <<= 1;
+                    if (comp(bst[bucket_pos - 1], d)) bucket_pos = (bucket_pos << 1) + 1;
+                    else bucket_pos <<= 1;
                 }
 
-                bucketPos = bucketPos - K;
+                bucket_pos = bucket_pos - K;
             } else {
-                if (comp(bst[0], d)) bucketPos = 2;
-                else if (comp(d, bst[0])) bucketPos = 0;
+                if (comp(bst[0], d)) bucket_pos = 2;
+                else if (comp(d, bst[0])) bucket_pos = 0;
             }
 
-            atomicAdd(buckets + bucketPos * LOCAL_COUNTERS + threadIdx.x % LOCAL_COUNTERS, 1);
+            atomicAdd(buckets + bucket_pos * LOCAL_COUNTERS + threadIdx.x % LOCAL_COUNTERS, 1);
         }
 
         __syncthreads();
@@ -92,7 +92,7 @@ namespace SampleSort {
                 for (int k = 0; k < COUNTER_COPIES; ++k)
                     b += buckets[i * LOCAL_COUNTERS + j + k * COUNTERS];
 
-                globalBuckets[(i * grid * COUNTERS) + (block * COUNTERS) + j] = b;
+                global_buckets[(i * grid * COUNTERS) + (block * COUNTERS) + j] = b;
             }
         }
     }

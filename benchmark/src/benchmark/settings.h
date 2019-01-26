@@ -38,7 +38,7 @@ namespace Benchmark {
         const std::uint32_t g;
         const std::uint32_t range;
         const KeyType::Value key_type;
-        const bool keys_have_values;
+        const bool keys_only;
         const std::string output_file;
         const std::vector<std::uint64_t> sizes;
 
@@ -51,7 +51,7 @@ namespace Benchmark {
                  std::uint32_t g,
                  std::uint32_t range,
                  KeyType::Value key_type,
-                 bool keys_have_values,
+                 bool keys_only,
                  std::string output_file,
                  std::vector<std::uint64_t> sizes) :
                 algorithm(algorithm),
@@ -61,7 +61,7 @@ namespace Benchmark {
                 g(g),
                 range(range),
                 key_type(key_type),
-                keys_have_values(keys_have_values),
+                keys_only(keys_only),
                 output_file(std::move(output_file)),
                 sizes(std::move(sizes)) {}
     };

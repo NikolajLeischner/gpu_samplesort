@@ -29,14 +29,14 @@
 
 namespace SampleSort {
 
-    // Batcher's odd-even-merge-sort. Sorts elements in shared memory. paddedSize is the next
+    // Batcher's odd-even-merge-sort. Sorts elements in shared memory. PADDED_SIZE is the next
     // power of two larger than the input size.
-    template<typename KeyType, typename CompType, int paddedSize, unsigned int CTA_SIZE>
+    template<typename KeyType, typename CompType, int PADDED_SIZE, unsigned int CTA_SIZE>
     __device__ void odd_even_sort(KeyType *keys, const int size, CompType comp) {
-        for (int p = paddedSize >> 1; p > 0; p >>= 1) {
+        for (int p = PADDED_SIZE >> 1; p > 0; p >>= 1) {
             int r = 0, d = p;
 
-            for (int q = paddedSize >> 1; q >= p; q >>= 1) {
+            for (int q = PADDED_SIZE >> 1; q >= p; q >>= 1) {
                 for (int k = threadIdx.x; k < size; k += CTA_SIZE) {
                     if (((k & p) == r) && ((k + d) < size)) {
                         KeyType sk = keys[k];
@@ -88,12 +88,12 @@ namespace SampleSort {
     }
 
     // Same as above but for key-value-pairs.
-    template<typename KeyType, typename ValueType, typename CompType, int paddedSize, unsigned int CTA_SIZE>
+    template<typename KeyType, typename ValueType, typename CompType, int PADDED_SIZE, unsigned int CTA_SIZE>
     __device__ void odd_even_sort(KeyType *keys, ValueType *values, const int size, CompType comp) {
-        for (int p = paddedSize >> 1; p > 0; p >>= 1) {
+        for (int p = PADDED_SIZE >> 1; p > 0; p >>= 1) {
             int r = 0, d = p;
 
-            for (int q = paddedSize >> 1; q >= p; q >>= 1) {
+            for (int q = PADDED_SIZE >> 1; q >= p; q >>= 1) {
                 for (int k = threadIdx.x; k < size; k += CTA_SIZE) {
                     if (((k & p) == r) && ((k + d) < size)) {
                         KeyType sk = keys[k];

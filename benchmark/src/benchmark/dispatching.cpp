@@ -23,7 +23,7 @@ namespace Benchmark {
 
             Timer timer;
             std::vector<KeyType> data(distribution.as_vector());
-            sort_with_algorithm<KeyType>(settings.algorithm, settings.keys_have_values, data, timer);
+            sort_with_algorithm<KeyType>(settings.algorithm, settings.keys_only, data, timer);
 
             std::cout << "Sorting time was " << std::fixed << std::setprecision(4) << timer.elapsed() << "ms for " <<
                       size << " elements." << std::endl;
@@ -42,7 +42,7 @@ namespace Benchmark {
         }
 
         template<typename KeyType>
-        void sort_with_algorithm(Algorithm::Value algorithm, bool keys_have_values, std::vector<KeyType> &data,
+        void sort_with_algorithm(Algorithm::Value algorithm, bool keys_only, std::vector<KeyType> &data,
                                  Timer &timer) {
             switch (algorithm) {
                 case Algorithm::Value::cpu_parallel:
@@ -58,9 +58,9 @@ namespace Benchmark {
                 case Algorithm::Value::thrust:
                 case Algorithm::Value::samplesort:
                     // Run once to ensure the GPU kernels are compiled before benchmarking.
-                    benchmark_algorithm(algorithm, keys_have_values, data);
+                    sort_by_algorithm(algorithm, keys_only, data);
                     timer.start();
-                    benchmark_algorithm(algorithm, keys_have_values, data);
+                    sort_by_algorithm(algorithm, keys_only, data);
                     timer.stop();
                     break;
             }

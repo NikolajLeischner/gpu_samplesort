@@ -4,6 +4,5 @@
 
 namespace Benchmark {
     template<typename KeyType>
-    double benchmark_algorithm(Benchmark::Algorithm::Value algorithm, bool keys_have_values,
-                               std::vector<KeyType> &data);
+    void sort_by_algorithm(Benchmark::Algorithm::Value algorithm, bool keys_only, std::vector<KeyType> &data);
 }

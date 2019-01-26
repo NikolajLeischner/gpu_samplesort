@@ -7,15 +7,21 @@
 
 namespace Benchmark {
     template<typename KeyType>
-    double benchmark_algorithm(Algorithm::Value algorithm, bool keys_have_values, std::vector<KeyType> &data) {
-
+    void sort_by_algorithm(Algorithm::Value algorithm, bool keys_only, std::vector<KeyType> &data) {
         KeyType *device_keys(0);
         std::uint64_t *device_values(0);
         size_t size = sizeof(KeyType) * data.size();
         cudaMalloc((void **) &device_keys, size);
         cudaMemcpy(device_keys, data.data(), size, cudaMemcpyHostToDevice);
 
-        if (keys_have_values) {
+        if (keys_only) {
+            if (algorithm == Algorithm::Value::thrust) {
+                thrust::device_ptr <KeyType> keys_ptr(device_keys);
+                thrust::sort(keys_ptr, keys_ptr + data.size());
+            } else if (algorithm == Algorithm::Value::samplesort) {
+                SampleSort::sort(device_keys, device_keys + data.size());
+            }
+        } else {
             auto values = Distributions::uniform<std::uint64_t>(data.size(), Distributions::Settings(64, 1));
 
             cudaMalloc((void **) &device_values, values.memory_size());
@@ -30,29 +36,20 @@ namespace Benchmark {
             }
 
             cudaMemcpy(values.as_vector().data(), device_values, values.memory_size(), cudaMemcpyDeviceToHost);
-        } else {
-            if (algorithm == Algorithm::Value::thrust) {
-                thrust::device_ptr <KeyType> keys_ptr(device_keys);
-                thrust::sort(keys_ptr, keys_ptr + data.size());
-            } else if (algorithm == Algorithm::Value::samplesort) {
-                SampleSort::sort(device_keys, device_keys + data.size());
-            }
         }
 
         cudaMemcpy(data.data(), device_keys, size, cudaMemcpyDeviceToHost);
         cudaFree(device_keys);
         cudaFree(device_values);
-
-        return 0.0;
     }
 
 
-    template double benchmark_algorithm(Algorithm::Value algorithm, bool keys_have_values,
+    template void sort_by_algorithm(Algorithm::Value algorithm, bool keys_only,
                                         std::vector<std::uint16_t> &data);
 
-    template double benchmark_algorithm(Algorithm::Value algorithm, bool keys_have_values,
+    template void sort_by_algorithm(Algorithm::Value algorithm, bool keys_only,
                                         std::vector<std::uint32_t> &data);
 
-    template double benchmark_algorithm(Algorithm::Value algorithm, bool keys_have_values,
+    template void sort_by_algorithm(Algorithm::Value algorithm, bool keys_only,
                                         std::vector<std::uint64_t> &data);
 }

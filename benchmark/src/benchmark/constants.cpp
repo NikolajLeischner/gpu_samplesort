@@ -41,7 +41,7 @@ namespace Benchmark {
                         Distributions::Type::parse(distribution.getValue()),
                         Distributions::Settings(bits_per_key.getValue(), samples_per_key.getValue()),
                         parameter_p.getValue(), parameter_g.getValue(), parameter_range.getValue(),
-                        KeyType::parse(key_type.getValue()), keys_have_values.getValue(), output.getValue(),
+                        KeyType::parse(key_type.getValue()), !keys_have_values.getValue(), output.getValue(),
                         sizes.getValue());
     }
 
