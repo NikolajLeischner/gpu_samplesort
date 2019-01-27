@@ -36,12 +36,14 @@ namespace SampleSort {
     // Like the original implementation the code tries to obey the memory coalescing rules for the G80
     // architecture. In this case doing so also improves performance on the G200 architecture.
     template<int LOCAL_SORT_SIZE, int CTA_SIZE, typename KeyType, typename CompType>
-    __global__ static void quicksort(KeyType *keysInput, KeyType *keysBuffer, const struct Bucket *bucketParams,
-                                     CompType comp) {
-        const int sharedSize = LOCAL_SORT_SIZE < 2 * CTA_SIZE ? 2 * CTA_SIZE : LOCAL_SORT_SIZE;
+    __global__ static void quicksort(
+            KeyType *keys_input,
+            KeyType *keys_buffer,
+            const struct Bucket *buckets,
+            CompType comp) {
+        const int shared_size = LOCAL_SORT_SIZE < 2 * CTA_SIZE ? 2 * CTA_SIZE : LOCAL_SORT_SIZE;
         // Used for shared memory sorting and for holding 3 prefix sum arrays of block size.
-        __shared__
-        KeyType shared[sharedSize];
+        __shared__ KeyType shared[shared_size];
 
         // A stack is used to handle recursion.
         __shared__ int stack;
@@ -50,8 +52,8 @@ namespace SampleSort {
         __shared__ bool flip[32];
 
         // The total number of small and large elements.
-        __shared__ unsigned int smallOffset;
-        __shared__ unsigned int largeOffset;
+        __shared__ unsigned int small_offset;
+        __shared__ unsigned int large_offset;
 
         // The current pivot.
         __shared__ KeyType pivot;
@@ -66,9 +68,9 @@ namespace SampleSort {
 
         // Initialize by putting the whole input on the stack.
         if (threadIdx.x == 0) {
-            start[0] = bucketParams[blockIdx.x].start;
-            end[0] = bucketParams[blockIdx.x].start + bucketParams[blockIdx.x].size;
-            flip[0] = bucketParams[blockIdx.x].flipped;
+            start[0] = buckets[blockIdx.x].start;
+            end[0] = buckets[blockIdx.x].start + buckets[blockIdx.x].size;
+            flip[0] = buckets[blockIdx.x].flipped;
 
             stack = 0;
         }
@@ -82,8 +84,8 @@ namespace SampleSort {
                 to = end[stack];
                 size = to - from;
 
-                keys = flip[stack] ? keysBuffer : keysInput;
-                keys2 = flip[stack] ? keysInput : keysBuffer;
+                keys = flip[stack] ? keys_buffer : keys_input;
+                keys2 = flip[stack] ? keys_input : keys_buffer;
             }
 
             __syncthreads();
@@ -121,7 +123,7 @@ namespace SampleSort {
                     } else odd_even_sort<KeyType, CompType, 32>(shared, size, comp);
 
                     for (int i = threadIdx.x; i < size; i += CTA_SIZE)
-                        keysInput[i + from] = shared[i];
+                        keys_input[i + from] = shared[i];
                 }
 
                 if (threadIdx.x == 0)
@@ -170,7 +172,7 @@ namespace SampleSort {
 
                 unsigned int x = from + buffer[threadIdx.x + 1] - 1;
                 __syncthreads();
-                if (threadIdx.x == 0) smallOffset = buffer[CTA_SIZE];
+                if (threadIdx.x == 0) small_offset = buffer[CTA_SIZE];
                 buffer[threadIdx.x] = lr;
                 __syncthreads();
                 brent_kung_inclusive<unsigned int, CTA_SIZE>(buffer);
@@ -178,20 +180,20 @@ namespace SampleSort {
                 unsigned int y = to - buffer[threadIdx.x + 1];
 
                 if (threadIdx.x == 0) {
-                    largeOffset = buffer[CTA_SIZE];
+                    large_offset = buffer[CTA_SIZE];
 
                     // Refill the stack.
                     flip[stack + 1] = !flip[stack];
                     flip[stack] = !flip[stack];
 
-                    if (smallOffset < largeOffset) {
+                    if (small_offset < large_offset) {
                         start[stack + 1] = start[stack];
-                        start[stack] = to - largeOffset;
-                        end[stack + 1] = from + smallOffset;
+                        start[stack] = to - large_offset;
+                        end[stack + 1] = from + small_offset;
                     } else {
                         end[stack + 1] = end[stack];
-                        end[stack] = from + smallOffset;
-                        start[stack + 1] = to - largeOffset;
+                        end[stack] = from + small_offset;
+                        start[stack + 1] = to - large_offset;
                     }
 
                     ++stack;
@@ -221,8 +223,8 @@ namespace SampleSort {
 
                 // Write the keys equal to the pivot to the output array since
                 // their final position is known.
-                for (int i = from + smallOffset + threadIdx.x; i < to - largeOffset; i += CTA_SIZE)
-                    keysInput[i] = pivot;
+                for (int i = from + small_offset + threadIdx.x; i < to - large_offset; i += CTA_SIZE)
+                    keys_input[i] = pivot;
                 __syncthreads();
             }
         }
@@ -230,13 +232,17 @@ namespace SampleSort {
 
     // Same as above but for key-value-pairs.
     template<int LOCAL_SORT_SIZE, int CTA_SIZE, typename KeyType, typename ValueType, typename CompType>
-    __global__ static void quicksort(KeyType *keysInput, KeyType *keysBuffer, ValueType *valuesInput,
-                                     ValueType *valuesBuffer, struct Bucket *bucketParams,
-                                     CompType comp) {
+    __global__ static void quicksort(
+            KeyType *keys_input,
+            KeyType *keys_buffer,
+            ValueType *values_input,
+            ValueType *values_buffer,
+            struct Bucket *buckets,
+            CompType comp) {
         // Used for shared memory sorting and for holding 3 prefix sum arrays of block size.
-        const int sharedSize = LOCAL_SORT_SIZE < 2 * (CTA_SIZE + 1) ? 2 * (CTA_SIZE + 1) : LOCAL_SORT_SIZE;
-        __shared__ KeyType shared[sharedSize];
-        __shared__ ValueType sharedValues[LOCAL_SORT_SIZE];
+        const int shared_size = LOCAL_SORT_SIZE < 2 * (CTA_SIZE + 1) ? 2 * (CTA_SIZE + 1) : LOCAL_SORT_SIZE;
+        __shared__ KeyType shared[shared_size];
+        __shared__ ValueType shared_values[LOCAL_SORT_SIZE];
 
         // A stack is used to handle recursion.
         __shared__ int stack;
@@ -246,9 +252,9 @@ namespace SampleSort {
 
         // Arrays for calculating prefix sums over the number of smaller/equal/larger elements
         // for each thread.
-        unsigned int *smallBlock = (unsigned int *) shared;
-        unsigned int *equalBlock = (unsigned int *) (&smallBlock[(CTA_SIZE + 1)]);
-        unsigned int *largeBlock = (unsigned int *) sharedValues;
+        unsigned int *small_block = (unsigned int *) shared;
+        unsigned int *equal_block = (unsigned int *) (&small_block[(CTA_SIZE + 1)]);
+        unsigned int *large_block = (unsigned int *) shared_values;
 
         // The current pivot.
         __shared__ KeyType pivot;
@@ -265,9 +271,9 @@ namespace SampleSort {
 
         // Initialize by putting the whole input on the stack.
         if (threadIdx.x == 0) {
-            start[0] = bucketParams[blockIdx.x].start;
-            end[0] = bucketParams[blockIdx.x].start + bucketParams[blockIdx.x].size;
-            flip[0] = bucketParams[blockIdx.x].flipped;
+            start[0] = buckets[blockIdx.x].start;
+            end[0] = buckets[blockIdx.x].start + buckets[blockIdx.x].size;
+            flip[0] = buckets[blockIdx.x].flipped;
 
             stack = 0;
         }
@@ -282,15 +288,15 @@ namespace SampleSort {
                 size = to - from;
 
                 if (!flip[stack]) {
-                    keys = keysInput;
-                    keys2 = keysBuffer;
-                    values = valuesInput;
-                    values2 = valuesBuffer;
+                    keys = keys_input;
+                    keys2 = keys_buffer;
+                    values = values_input;
+                    values2 = values_buffer;
                 } else {
-                    keys = keysBuffer;
-                    keys2 = keysInput;
-                    values = valuesBuffer;
-                    values2 = valuesInput;
+                    keys = keys_buffer;
+                    keys2 = keys_input;
+                    values = values_buffer;
+                    values2 = values_input;
                 }
             }
 
@@ -305,7 +311,7 @@ namespace SampleSort {
                         ValueType value = values[i + from - coal];
                         if (i >= coal) {
                             shared[i - coal] = key;
-                            sharedValues[i - coal] = value;
+                            shared_values[i - coal] = value;
                         }
                     }
 
@@ -316,40 +322,40 @@ namespace SampleSort {
                     // distinctions would have to be added. Also a minimum block size of 256 is assumed here.
                     if (size > 1024) {
                         if (CTA_SIZE > 1024)
-                            odd_even_sort<KeyType, ValueType, CompType, 2048>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 2048>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 2048, CTA_SIZE>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 2048, CTA_SIZE>(shared, shared_values, size, comp);
                     } else if (size > 512) {
                         if (CTA_SIZE > 512)
-                            odd_even_sort<KeyType, ValueType, CompType, 1024>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 1024>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 1024, CTA_SIZE>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 1024, CTA_SIZE>(shared, shared_values, size, comp);
                     } else if (size > 256) {
                         if (CTA_SIZE > 256)
-                            odd_even_sort<KeyType, ValueType, CompType, 512>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 512>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 512, CTA_SIZE>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 512, CTA_SIZE>(shared, shared_values, size, comp);
                     } else if (size > 128) {
                         if (CTA_SIZE > 128)
-                            odd_even_sort<KeyType, ValueType, CompType, 256>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 256>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 256, CTA_SIZE>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 256, CTA_SIZE>(shared, shared_values, size, comp);
                     } else if (size > 64) {
                         if (CTA_SIZE > 64)
-                            odd_even_sort<KeyType, ValueType, CompType, 128>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 128>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 128, CTA_SIZE>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 128, CTA_SIZE>(shared, shared_values, size, comp);
                     } else if (size > 32) {
                         if (CTA_SIZE > 32)
-                            odd_even_sort<KeyType, ValueType, CompType, 64>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 64>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 64, CTA_SIZE>(shared, sharedValues, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 64, CTA_SIZE>(shared, shared_values, size, comp);
                     } else
-                        odd_even_sort<KeyType, ValueType, CompType, 32>(shared, sharedValues, size, comp);
+                        odd_even_sort<KeyType, ValueType, CompType, 32>(shared, shared_values, size, comp);
 
                     for (int i = threadIdx.x; i < size; i += CTA_SIZE) {
-                        keysInput[i + from] = shared[i];
-                        valuesInput[i + from] = sharedValues[i];
+                        keys_input[i + from] = shared[i];
+                        values_input[i + from] = shared_values[i];
                     }
                 }
 
@@ -395,14 +401,14 @@ namespace SampleSort {
                 }
 
                 // Store the result in shared memory for the prefix sums.
-                smallBlock[threadIdx.x] = ll;
-                equalBlock[threadIdx.x] = lm;
-                largeBlock[threadIdx.x] = lr;
+                small_block[threadIdx.x] = ll;
+                equal_block[threadIdx.x] = lm;
+                large_block[threadIdx.x] = lr;
 
                 __syncthreads();
 
                 // Blelloch's scan is not optimal, but it is in-place.
-                scan3<unsigned int, CTA_SIZE>(smallBlock, equalBlock, largeBlock);
+                scan3<unsigned int, CTA_SIZE>(small_block, equal_block, large_block);
 
                 // Refill the stack.
                 if (threadIdx.x == 0) {
@@ -410,14 +416,14 @@ namespace SampleSort {
                     flip[stack] = !flip[stack];
 
                     // Tail recursion to limit the stack size.
-                    if (smallBlock[CTA_SIZE] < largeBlock[CTA_SIZE]) {
+                    if (small_block[CTA_SIZE] < large_block[CTA_SIZE]) {
                         start[stack + 1] = from;
-                        start[stack] = to - largeBlock[CTA_SIZE];
-                        end[stack + 1] = from + smallBlock[CTA_SIZE];
+                        start[stack] = to - large_block[CTA_SIZE];
+                        end[stack + 1] = from + small_block[CTA_SIZE];
                     } else {
                         end[stack + 1] = to;
-                        end[stack] = from + smallBlock[CTA_SIZE];
-                        start[stack + 1] = to - largeBlock[CTA_SIZE];
+                        end[stack] = from + small_block[CTA_SIZE];
+                        start[stack + 1] = to - large_block[CTA_SIZE];
                     }
 
                     stack++;
@@ -425,9 +431,9 @@ namespace SampleSort {
 
                 __syncthreads();
 
-                unsigned int x = from + smallBlock[threadIdx.x + 1] - 1;
-                unsigned int y = to - largeBlock[threadIdx.x + 1];
-                unsigned int z = from + smallBlock[CTA_SIZE] + equalBlock[threadIdx.x];
+                unsigned int x = from + small_block[threadIdx.x + 1] - 1;
+                unsigned int y = to - large_block[threadIdx.x + 1];
+                unsigned int z = from + small_block[CTA_SIZE] + equal_block[threadIdx.x];
 
                 // Use the prefix sums to write the elements to their new positions.
                 if (threadIdx.x + from - coal < to) {
@@ -473,9 +479,9 @@ namespace SampleSort {
 
                 // Write the keys/values equal to the pivot to the output array since
                 // their final position is known.
-                for (int i = from + smallBlock[CTA_SIZE] + threadIdx.x; i < to - largeBlock[CTA_SIZE]; i += CTA_SIZE) {
-                    keysInput[i] = keys2[i];
-                    valuesInput[i] = values2[i];
+                for (int i = from + small_block[CTA_SIZE] + threadIdx.x; i < to - large_block[CTA_SIZE]; i += CTA_SIZE) {
+                    keys_input[i] = keys2[i];
+                    values_input[i] = values2[i];
                 }
                 __syncthreads();
             }

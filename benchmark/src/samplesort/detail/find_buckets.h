@@ -32,9 +32,13 @@ namespace SampleSort {
     // offsets for scattering a prefix sum has to be performed afterwards.
     // Bucket-finding & scattering must use the same number of elements per thread.
     template<int K, int LOG_K, int CTA_SIZE, int COUNTERS, int COUNTER_COPIES, bool DEGENERATED, typename KeyType, typename CompType>
-    __global__ static void find_buckets(KeyType *keys, int min_pos, int max_pos, int *global_buckets,
-                                        int keys_per_thread,
-                                        CompType comp) {
+    __global__ static void find_buckets(
+            KeyType *keys,
+            int min_pos,
+            int max_pos,
+            int *global_buckets,
+            int keys_per_thread,
+            CompType comp) {
         const int LOCAL_COUNTERS = COUNTERS * COUNTER_COPIES;
         // This reduces register usage.
         __shared__ int block;

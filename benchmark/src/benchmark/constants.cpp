@@ -10,17 +10,27 @@ namespace Benchmark {
         std::string version("0.1");
         TCLAP::CmdLine cmd("", ' ', version);
 
-        TCLAP::ValueArg<std::string> algorithm("a", "algorithm", "", true, "samplesort", "");
-        TCLAP::ValueArg<std::string> distribution("d", "distribution", "", false, "uniform", "");
-        TCLAP::ValueArg<std::uint32_t> parameter_p("p", "parameter-p", "", false, 128, "");
-        TCLAP::ValueArg<std::uint32_t> parameter_g("g", "parameter-g", "", false, 8, "");
-        TCLAP::ValueArg<std::uint32_t> parameter_range("r", "parameter-range", "", false, 30, "");
-        TCLAP::ValueArg<std::string> key_type("k", "key-type", "", false, "uint32", "");
-        TCLAP::ValueArg<std::size_t> samples_per_key("s", "samples", "", false, 1, "");
-        TCLAP::ValueArg<std::size_t> bits_per_key("b", "bits", "", false, 32, "");
-        TCLAP::ValueArg<bool> keys_have_values("v", "keys-have-values", "", false, false, "");
-        TCLAP::ValueArg<std::string> output("o", "output-file", "", false, "result.csv", "");
-        TCLAP::MultiArg<std::uint64_t> sizes("i", "sizes", "", true, "");
+        TCLAP::ValueArg<std::string> algorithm("a", "algorithm",
+                "Algorithm to benchmark.", true, "samplesort", "cpu_stl, cpu_parallel, thrust, samplesort");
+        TCLAP::ValueArg<std::string> distribution("d", "distribution",
+                "The type of random distribution to use.", false, "uniform",
+                "zero, sorted, uniform, gaussian, bucket, staggered, g-groups, sorted-descending, random-duplicates, deterministic-duplicates");
+        TCLAP::ValueArg<std::uint32_t> parameter_p("p", "parameter-p",
+                "Parameter P for the distribution types bucket, g-groups, staggered, random-duplicates, deterministic-duplicates.", false, 128, "int");
+        TCLAP::ValueArg<std::uint32_t> parameter_g("g", "parameter-g",
+                "Parameter G for the distribution type g-groups.", false, 8, "int");
+        TCLAP::ValueArg<std::uint32_t> parameter_range("r", "parameter-range",
+                "Parameter Range for the distribution type random-duplicates.", false, 30, "int");
+        TCLAP::ValueArg<std::string> key_type("k", "key-type", "Key type.", false, "uint32", "uint16, uint32, uint64");
+        TCLAP::ValueArg<std::size_t> samples_per_key("s", "samples",
+                "Random samples taken per key. The samples are combined with logical and; taking more samples reduces the entropy of the data.", false, 1, "int");
+        TCLAP::ValueArg<std::size_t> bits_per_key("b", "bits",
+                "Number of bits per key that are not zeroed out. Choosing a lower bit count reduces the entropy of the data.", false, 32, "int");
+        TCLAP::SwitchArg keys_have_values("v", "keys-have-values",
+                "If set, a key-value sort is done, where the values are 64bit integers.", false);
+        TCLAP::ValueArg<std::string> output("o", "output-file",
+                "Destination file for the CSV output of the benchmark run.", false, "result.csv", "file name");
+        TCLAP::MultiArg<std::uint64_t> sizes("i", "sizes", "Input sizes to benchmark.", true, "int");
 
         cmd.add(algorithm);
         cmd.add(distribution);

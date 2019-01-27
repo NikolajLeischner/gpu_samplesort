@@ -35,9 +35,15 @@
 namespace SampleSort {
     // For each CTA, sort a random sample of it's part of the input sequence and create a binary search tree.
     template<int K, int A, int CTA_SIZE, int LOCAL_SORT_SIZE, typename KeyType, typename CompType>
-    __global__ static void create_bst(KeyType *keysIn, KeyType *keysOut, struct Bucket *bucketParams,
-                                      KeyType *bst, KeyType *sample, KeyType *sampleBuffer, Lrand48 rng,
-                                      CompType comp) {
+    __global__ static void create_bst(
+            KeyType *keys_input,
+            KeyType *keys_output,
+            struct Bucket *buckets,
+            KeyType *bst,
+            KeyType *sample,
+            KeyType *sample_buffer,
+            Lrand48 rng,
+            CompType comp) {
         __shared__ int from;
         __shared__ int size;
         __shared__ KeyType *input;
@@ -45,12 +51,12 @@ namespace SampleSort {
 
         if (threadIdx.x == 0) {
             block = blockIdx.x;
-            from = bucketParams[blockIdx.x].start;
-            size = bucketParams[blockIdx.x].size;
-            if (!bucketParams[blockIdx.x].flipped)
-                input = keysIn;
+            from = buckets[blockIdx.x].start;
+            size = buckets[blockIdx.x].size;
+            if (!buckets[blockIdx.x].flipped)
+                input = keys_input;
             else
-                input = keysOut;
+                input = keys_output;
         }
 
         __syncthreads();
@@ -78,8 +84,8 @@ namespace SampleSort {
         __shared__ bool flip[32];
 
         // The total number of small and large elements.
-        __shared__ unsigned int smallOffset;
-        __shared__ unsigned int largeOffset;
+        __shared__ unsigned int small_offset;
+        __shared__ unsigned int large_offset;
 
         // The current pivot.
         __shared__ KeyType pivot;
@@ -109,8 +115,8 @@ namespace SampleSort {
                 to = end[stack];
                 size = to - from;
 
-                keys = flip[stack] ? sampleBuffer : sample;
-                keys2 = flip[stack] ? sample : sampleBuffer;
+                keys = flip[stack] ? sample_buffer : sample;
+                keys2 = flip[stack] ? sample : sample_buffer;
             }
 
             __syncthreads();
@@ -118,10 +124,10 @@ namespace SampleSort {
             // If the sequence is small enough it is sorted in shared memory.
             if (size <= LOCAL_SORT_SIZE) {
                 if (size > 0) {
-                    KeyType *sharedKeys = (KeyType *) shared;
+                    KeyType *shared_keys = (KeyType *) shared;
                     unsigned int coal = (from) & 0xf;
                     for (int i = threadIdx.x - coal; i < size; i += CTA_SIZE)
-                        if (i >= 0) sharedKeys[i] = keys[i + from];
+                        if (i >= 0) shared_keys[i] = keys[i + from];
 
                     __syncthreads();
 
@@ -130,27 +136,27 @@ namespace SampleSort {
                     // distinctions would have to be added. Also a minimum block size of 256 is assumed here.
                     if (size > 1024) {
                         if (CTA_SIZE > 1024)
-                            odd_even_sort<KeyType, CompType, 2048>(sharedKeys, size, comp);
-                        else odd_even_sort<KeyType, CompType, 2048, CTA_SIZE>(sharedKeys, size, comp);
+                            odd_even_sort<KeyType, CompType, 2048>(shared_keys, size, comp);
+                        else odd_even_sort<KeyType, CompType, 2048, CTA_SIZE>(shared_keys, size, comp);
                     } else if (size > 512) {
-                        if (CTA_SIZE > 512) odd_even_sort<KeyType, CompType, 1024>(sharedKeys, size, comp);
-                        else odd_even_sort<KeyType, CompType, 1024, CTA_SIZE>(sharedKeys, size, comp);
+                        if (CTA_SIZE > 512) odd_even_sort<KeyType, CompType, 1024>(shared_keys, size, comp);
+                        else odd_even_sort<KeyType, CompType, 1024, CTA_SIZE>(shared_keys, size, comp);
                     } else if (size > 256) {
-                        if (CTA_SIZE > 256) odd_even_sort<KeyType, CompType, 512>(sharedKeys, size, comp);
-                        else odd_even_sort<KeyType, CompType, 512, CTA_SIZE>(sharedKeys, size, comp);
+                        if (CTA_SIZE > 256) odd_even_sort<KeyType, CompType, 512>(shared_keys, size, comp);
+                        else odd_even_sort<KeyType, CompType, 512, CTA_SIZE>(shared_keys, size, comp);
                     } else if (size > 128) {
-                        if (CTA_SIZE > 128) odd_even_sort<KeyType, CompType, 256>(sharedKeys, size, comp);
-                        else odd_even_sort<KeyType, CompType, 256, CTA_SIZE>(sharedKeys, size, comp);
+                        if (CTA_SIZE > 128) odd_even_sort<KeyType, CompType, 256>(shared_keys, size, comp);
+                        else odd_even_sort<KeyType, CompType, 256, CTA_SIZE>(shared_keys, size, comp);
                     } else if (size > 64) {
-                        if (CTA_SIZE > 64) odd_even_sort<KeyType, CompType, 128>(sharedKeys, size, comp);
-                        else odd_even_sort<KeyType, CompType, 128, CTA_SIZE>(sharedKeys, size, comp);
+                        if (CTA_SIZE > 64) odd_even_sort<KeyType, CompType, 128>(shared_keys, size, comp);
+                        else odd_even_sort<KeyType, CompType, 128, CTA_SIZE>(shared_keys, size, comp);
                     } else if (size > 32) {
-                        if (CTA_SIZE > 32) odd_even_sort<KeyType, CompType, 64>(sharedKeys, size, comp);
-                        else odd_even_sort<KeyType, CompType, 64, CTA_SIZE>(sharedKeys, size, comp);
-                    } else odd_even_sort<KeyType, CompType, 32>(sharedKeys, size, comp);
+                        if (CTA_SIZE > 32) odd_even_sort<KeyType, CompType, 64>(shared_keys, size, comp);
+                        else odd_even_sort<KeyType, CompType, 64, CTA_SIZE>(shared_keys, size, comp);
+                    } else odd_even_sort<KeyType, CompType, 32>(shared_keys, size, comp);
 
                     for (int i = threadIdx.x; i < size; i += CTA_SIZE)
-                        sample[i + from] = sharedKeys[i];
+                        sample[i + from] = shared_keys[i];
                 }
 
                 if (threadIdx.x == 0)
@@ -197,7 +203,7 @@ namespace SampleSort {
 
                 unsigned int x = from + buffer[threadIdx.x + 1] - 1;
                 __syncthreads();
-                if (threadIdx.x == 0) smallOffset = buffer[CTA_SIZE];
+                if (threadIdx.x == 0) small_offset = buffer[CTA_SIZE];
                 buffer[threadIdx.x] = lr;
                 __syncthreads();
                 brent_kung_inclusive<unsigned int, CTA_SIZE>(buffer);
@@ -205,20 +211,20 @@ namespace SampleSort {
                 unsigned int y = to - buffer[threadIdx.x + 1];
 
                 if (threadIdx.x == 0) {
-                    largeOffset = buffer[CTA_SIZE];
+                    large_offset = buffer[CTA_SIZE];
 
                     // Refill the stack.
                     flip[stack + 1] = !flip[stack];
                     flip[stack] = !flip[stack];
 
-                    if (smallOffset < largeOffset) {
+                    if (small_offset < large_offset) {
                         start[stack + 1] = start[stack];
-                        start[stack] = to - largeOffset;
-                        end[stack + 1] = from + smallOffset;
+                        start[stack] = to - large_offset;
+                        end[stack + 1] = from + small_offset;
                     } else {
                         end[stack + 1] = end[stack];
-                        end[stack] = from + smallOffset;
-                        start[stack + 1] = to - largeOffset;
+                        end[stack] = from + small_offset;
+                        start[stack + 1] = to - large_offset;
                     }
 
                     ++stack;
@@ -248,7 +254,7 @@ namespace SampleSort {
 
                 // Write the keys equal to the pivot to the output array since
                 // their final position is known.
-                for (unsigned int i = from + smallOffset + threadIdx.x; i < to - largeOffset; i += CTA_SIZE)
+                for (unsigned int i = from + small_offset + threadIdx.x; i < to - large_offset; i += CTA_SIZE)
                     sample[i] = pivot;
                 __syncthreads();
             }
@@ -261,15 +267,15 @@ namespace SampleSort {
 
             // If all splitters are equal do not bother to create the bst.
             if (!comp(first, last) && !comp(last, first)) {
-                bucketParams[block].degenerated = true;
+                buckets[block].degenerated = true;
                 bst[K * block] = sample[block * (A * K) + A];
             }
         }
         __syncthreads();
-        if (!bucketParams[block].degenerated) {
+        if (!buckets[block].degenerated) {
             for (int i = threadIdx.x; i < K; i += CTA_SIZE) {
-                int l = (int) __log2f(i + 1);
-                int pos = (A * K * (1 + 2 * ((i + 1) & (1 << l) - 1))) / (2 << l);
+                int _l = (int) __log2f(i + 1);
+                int pos = (A * K * (1 + 2 * ((i + 1) & (1 << _l) - 1))) / (2 << _l);
                 bst[i + K * block] = sample[block * (A * K) + pos];
             }
         }

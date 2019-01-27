@@ -30,7 +30,7 @@
 namespace SampleSort {
     struct Bucket {
         // Elements per thread to use for the bucket.
-        int elementsPerThread = 1;
+        int keys_per_thread = 1;
         int start;
         int size;
         // Is the bucket located in the input array or in the buffer?
@@ -40,7 +40,7 @@ namespace SampleSort {
         bool degenerated = false;
         bool constant = false;
 
-        Bucket(int start, int size, bool flipped = false) : elementsPerThread(1), start(start), size(size),
+        Bucket(int start, int size, bool flipped = false) : keys_per_thread(1), start(start), size(size),
                                                             flipped(flipped), degenerated(false), constant(false) {}
 
         Bucket() : Bucket(0, 0) {}
