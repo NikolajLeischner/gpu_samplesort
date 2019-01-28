@@ -2,7 +2,8 @@
 #include "distributions.h"
 #include "gpu_dispatching.h"
 #include "timer.h"
-#include <ppl.h>
+#include "parallel_sort.h"
+#include <algorithm>
 
 namespace Benchmark {
     namespace {
@@ -36,7 +37,7 @@ namespace Benchmark {
         template<typename KeyType>
         void assert_result_is_sorted(const std::vector<KeyType> &data, const std::vector<KeyType> &result) {
             std::vector<KeyType> ground_truth(data);
-            Concurrency::parallel_sort(ground_truth.begin(), ground_truth.end());
+            Benchmark::parallel_sort(ground_truth.begin(), ground_truth.end());
             if (result != ground_truth)
                 throw std::exception("Sorting failed!");
         }
@@ -47,7 +48,7 @@ namespace Benchmark {
             switch (algorithm) {
                 case Algorithm::Value::cpu_parallel:
                     timer.start();
-                    Concurrency::parallel_sort(data.begin(), data.end());
+                    Benchmark::parallel_sort(data.begin(), data.end());
                     timer.stop();
                     break;
                 case Algorithm::Value::cpu_stl:

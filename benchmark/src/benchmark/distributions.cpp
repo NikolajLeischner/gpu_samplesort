@@ -21,10 +21,10 @@ namespace Distributions {
             }
 
             T operator()() {
-                T result = distribution(gen);
+                T result = static_cast<T>(distribution(gen));
                 for (std::uint64_t i = 1; i < settings.samples; ++i)
                     result &= distribution(gen);
-                return static_cast<T>(result >> bits_to_remove);
+                return result >> bits_to_remove;
             }
 
         private:

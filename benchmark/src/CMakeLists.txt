@@ -37,6 +37,7 @@ SET(SOURCE_FILES
         samplesort/samplesort.cu
         samplesort/samplesort.h
         benchmark/gpu_dispatching.cu
+        benchmark/parallel_sort.h
         )
 
 ADD_LIBRARY(gpu_samplesort ${SOURCE_FILES})
