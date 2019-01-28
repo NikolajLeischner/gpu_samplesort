@@ -15,7 +15,7 @@ namespace Distributions {
         template<typename T>
         class Random {
         public:
-            explicit Random(const Settings &settings) : settings(settings), gen(std::mt19937(rd())),
+            explicit Random(const Settings &settings) : settings(settings), gen(std::mt19937_64(rd())),
                                                         bits_to_remove(sizeof(T) * 8 - settings.bits) {
                 gen.seed(17);
             }
@@ -24,14 +24,14 @@ namespace Distributions {
                 T result = distribution(gen);
                 for (std::uint64_t i = 1; i < settings.samples; ++i)
                     result &= distribution(gen);
-                return result >> bits_to_remove;
+                return static_cast<T>(result >> bits_to_remove);
             }
 
         private:
             const Settings settings;
             std::random_device rd;
-            std::mt19937 gen;
-            const std::uniform_int_distribution<T> distribution;
+            std::mt19937_64 gen;
+            std::uniform_int_distribution<std::uint64_t> distribution;
             const std::uint64_t bits_to_remove;
         };
     }
@@ -48,7 +48,7 @@ namespace Distributions {
     }
 
     template<typename T>
-    std::uint64_t Distribution<T>::size() const {
+    size_t Distribution<T>::size() const {
         return content.size();
     }
 
@@ -58,12 +58,12 @@ namespace Distributions {
     }
 
     template<typename T>
-    std::uint64_t Distribution<T>::memory_size() const {
+    size_t Distribution<T>::memory_size() const {
         return sizeof(T) * size();
     }
 
     template<typename T>
-    void Distribution<T>::print(std::uint64_t count) const {
+    void Distribution<T>::print(size_t count) const {
         for (std::uint64_t i = 0; i < std::min(count, size()); ++i)
             std::cout << *(begin() + i) << " ";
     }
@@ -289,14 +289,11 @@ namespace Distributions {
         return Distribution<T>(content);
     }
 
-    template
-    class Distribution<std::uint16_t>;
+    template class Distribution<std::uint16_t>;
 
-    template
-    class Distribution<std::uint32_t>;
+    template class Distribution<std::uint32_t>;
 
-    template
-    class Distribution<std::uint64_t>;
+    template class Distribution<std::uint64_t>;
 
     template Distribution<std::uint16_t>
     create(Type::Value type, std::uint64_t size, const Settings &settings, std::uint32_t p, std::uint32_t g,

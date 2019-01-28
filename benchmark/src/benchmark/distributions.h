@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+#include <cinttypes>
 #include <cstddef>
 #include <vector>
 
@@ -13,13 +15,13 @@ namespace Distributions {
 
         const T *end() const;
 
-        std::uint64_t size() const;
+        size_t size() const;
 
-        std::uint64_t memory_size() const;
+        size_t memory_size() const;
 
         explicit Distribution(std::vector<T> content);
 
-        void print(std::uint64_t count) const;
+        void print(size_t count) const;
 
         std::vector<T> as_vector() const;
 
