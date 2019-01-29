@@ -29,7 +29,7 @@ namespace Benchmark {
 
     struct Settings {
 
-        static Settings parse_from_cmd(int argc, char *argv[], bool disable_exception_handling = false);
+        static Settings parse_from_cmd(int argc, const char *argv[], bool disable_exception_handling = false);
 
         const Algorithm::Value algorithm;
         const Distributions::Type::Value distribution_type;

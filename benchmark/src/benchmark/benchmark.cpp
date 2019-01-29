@@ -5,7 +5,7 @@
 #include "settings.h"
 #include <tclap/CmdLine.h>
 
-int main(int argc, char *argv[]) {
+int main(int argc, const char *argv[]) {
     using namespace Benchmark;
     try {
         auto settings = Settings::parse_from_cmd(argc, argv);

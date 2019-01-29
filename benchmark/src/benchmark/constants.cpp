@@ -6,7 +6,7 @@
 #include <tclap/CmdLine.h>
 
 namespace Benchmark {
-    Settings Settings::parse_from_cmd(int argc, char *argv[], bool disable_exception_handling) {
+    Settings Settings::parse_from_cmd(int argc, const char *argv[], bool disable_exception_handling) {
         std::string version("0.1");
         TCLAP::CmdLine cmd("", ' ', version);
 

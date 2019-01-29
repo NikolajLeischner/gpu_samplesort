@@ -4,4 +4,11 @@ benchmark/.vs
 benchmark/cmake-build*
 benchmark/src/cmake-build*
 *.pyc
+*.csv
+*.a
+*/cmake-build*
+*CMakeFiles*
+*CMakeCache*
+*Makefile*
+*.cmake
 results/charts.html

@@ -1,5 +1,6 @@
 #include <bandit/bandit.h>
 
+using namespace snowhouse;
 using namespace bandit;
 
 #include "../src/benchmark/settings.h"
@@ -12,7 +13,7 @@ go_bandit([]() {
 
         it("should be created from command line arguments", [&]() {
             int argc(9);
-            char *argv[] = {"benchmark", "-a", "samplesort", "-d", "staggered", "-i", "1000", "-i", "128000"};
+            const char *argv[] = {"benchmark", "-a", "samplesort", "-d", "staggered", "-i", "1000", "-i", "128000"};
             auto settings = Settings::parse_from_cmd(argc, argv);
 
             AssertThat(settings.algorithm, Equals(Algorithm::Value::samplesort));
@@ -24,7 +25,7 @@ go_bandit([]() {
 
         it("should throw an exception if required arguments are missing", [&]() {
             int argc(3);
-            char *argv[] = {"benchmark", "-a", "thrust"};
+            const char *argv[] = {"benchmark", "-a", "thrust"};
             AssertThrows(std::exception, Settings::parse_from_cmd(argc, argv, true));
         });
 

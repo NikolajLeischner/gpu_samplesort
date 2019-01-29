@@ -12,9 +12,15 @@ SET(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 IF (MSVC)
         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
 ENDIF (MSVC)
-IF (GNU)
+IF (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -march=native")
-ENDIF (GNU)
+ENDIF ()
+
+INCLUDE_DIRECTORIES(
+        external
+        ../src/benchmark
+        ../src/samplesort
+        ../src/external)
 
 SET(SOURCES
   run_tests.cpp
