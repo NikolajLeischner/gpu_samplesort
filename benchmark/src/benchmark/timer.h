@@ -11,9 +11,7 @@ public:
     Timer() : start_time({0}), end_time({0}) {}
 
     void start();
-
     void stop();
-
     double elapsed();
 };
 

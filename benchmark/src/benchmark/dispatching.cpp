@@ -4,43 +4,10 @@
 #include "timer.h"
 #include "parallel_sort.h"
 #include <algorithm>
+#include <stdexcept>
 
 namespace Benchmark {
     namespace {
-
-        template<typename KeyType>
-        std::vector<Result> execute_with_settings(const Settings &settings) {
-            std::vector<Result> results;
-            for (const std::size_t &size : settings.sizes)
-                results.push_back(execute_for_size<KeyType>(settings, size));
-            return results;
-        }
-
-        template<typename KeyType>
-        Result execute_for_size(const Settings &settings, std::size_t size) {
-            auto distribution = Distributions::create<KeyType>(settings.distribution_type, size,
-                                                               settings.distribution_settings, settings.p, settings.g,
-                                                               settings.range);
-
-            Timer timer;
-            std::vector<KeyType> data(distribution.as_vector());
-            sort_with_algorithm<KeyType>(settings.algorithm, settings.keys_only, data, timer);
-
-            std::cout << "Sorting time was " << std::fixed << std::setprecision(4) << timer.elapsed() << "ms for " <<
-                      size << " elements." << std::endl;
-
-            assert_result_is_sorted(distribution.as_vector(), data);
-
-            return Result(timer.elapsed(), distribution.size());
-        }
-
-        template<typename KeyType>
-        void assert_result_is_sorted(const std::vector<KeyType> &data, const std::vector<KeyType> &result) {
-            std::vector<KeyType> ground_truth(data);
-            Benchmark::parallel_sort(ground_truth.begin(), ground_truth.end());
-            if (result != ground_truth)
-                throw std::exception("Sorting failed!");
-        }
 
         template<typename KeyType>
         void sort_with_algorithm(Algorithm::Value algorithm, bool keys_only, std::vector<KeyType> &data,
@@ -66,6 +33,40 @@ namespace Benchmark {
                     break;
             }
         }
+
+        template<typename KeyType>
+        void assert_result_is_sorted(const std::vector<KeyType> &data, const std::vector<KeyType> &result) {
+            std::vector<KeyType> ground_truth(data);
+            Benchmark::parallel_sort(ground_truth.begin(), ground_truth.end());
+            if (result != ground_truth)
+                throw std::runtime_error("Sorting failed!");
+        }
+
+        template<typename KeyType>
+        Result execute_for_size(const Settings &settings, std::size_t size) {
+            auto distribution = Distributions::create<KeyType>(settings.distribution_type, size,
+                                                               settings.distribution_settings, settings.p, settings.g,
+                                                               settings.range);
+
+            Timer timer;
+            std::vector<KeyType> data(distribution.as_vector());
+            sort_with_algorithm<KeyType>(settings.algorithm, settings.keys_only, data, timer);
+
+            std::cout << "Sorting time was " << std::fixed << std::setprecision(4) << timer.elapsed() << "ms for " <<
+                      size << " elements." << std::endl;
+
+            assert_result_is_sorted(distribution.as_vector(), data);
+
+            return Result(timer.elapsed(), distribution.size());
+        }
+
+        template<typename KeyType>
+        std::vector<Result> execute_with_settings(const Settings &settings) {
+            std::vector<Result> results;
+            for (const std::size_t &size : settings.sizes)
+                results.push_back(execute_for_size<KeyType>(settings, size));
+            return results;
+        }
     }
 
     std::vector<Result> execute_with_settings(const Settings &settings) {
@@ -77,7 +78,7 @@ namespace Benchmark {
             case KeyType::Value::uint16_t:
                 return execute_with_settings<std::uint16_t>(settings);
             default:
-                throw std::exception("Unhandled key type!");
+                throw std::runtime_error("Unhandled key type!");
         }
     }
 }

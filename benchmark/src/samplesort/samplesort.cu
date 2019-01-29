@@ -142,7 +142,7 @@ namespace SampleSort {
 
         typedef typename thrust::iterator_traits<KeyPtrType>::value_type KeyType;
         typedef typename thrust::iterator_traits<ValuePtrType>::value_type ValueType;
-        typedef typename StrictWeakOrdering CompType;
+        typedef StrictWeakOrdering CompType;
 
         KeyType *keys = thrust::raw_pointer_cast(&*begin);
         ValueType *values = thrust::raw_pointer_cast(&*values_begin);
