@@ -1,4 +1,4 @@
-Copyright (c) 2009-2016 Nikolaj Leischner and Vitaly Osipov
+Copyright (c) 2009-2019 Nikolaj Leischner and Vitaly Osipov
 
 Permission is hereby granted, free of charge, to any person
 obtaining a copy of this software and associated documentation
