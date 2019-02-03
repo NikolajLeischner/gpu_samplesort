@@ -1,0 +1,33 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
+
+PROJECT(tests)
+
+ENABLE_LANGUAGE(CUDA)
+
+SET(CMAKE_CUDA_STANDARD 11)
+SET(CMAKE_CXX_STANDARD 17)
+SET(CMAKE_CUDA_STANDARD_REQUIRED TRUE)
+SET(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+
+IF (MSVC)
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+ENDIF (MSVC)
+IF (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -march=native")
+ENDIF ()
+
+INCLUDE_DIRECTORIES(
+        external
+        ../src/benchmark
+        ../src/samplesort
+        ../src/external)
+
+SET(SOURCES
+  run_tests.cpp
+  distributions_test.cpp
+  settings_test.cpp
+)
+
+ADD_EXECUTABLE(tests ${SOURCES} )
+TARGET_LINK_LIBRARIES(tests gpu_samplesort ${CUDA_LIBRARIES})
+

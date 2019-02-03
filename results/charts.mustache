@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="../../favicon.ico">
+    <title>GPU Sample Sort Benchmark</title>
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+  </head>
+
+  <body>
+    <script src="./js/jquery.min.js"></script>
+    <script src="./js/bootstrap.min.js"></script>
+    <script src="./js/Chart.bundle.min.js"></script>
+
+    <div class="container-fluid">
+        <div class="row">
+        {{#chart}}
+        <div id="chart-{{id}}" class="col-md-4">
+            <canvas id="canvas-{{id}}" width="800" height="450"></canvas>
+        </div>
+        <script>
+        $(function () {
+            new Chart(document.getElementById('canvas-{{id}}'),
+            {
+                type: 'line',
+                options: {
+                  title: {
+                      display: true,
+                      text: '{{title}}'
+                  },
+                 scales: {
+                   xAxes: [{
+                     position: 'bottom',
+                     gridLines: {
+                       zeroLineColor: "rgba(0,255,0,1)"
+                     },
+                     type: 'linear'
+                   }],
+                   yAxes: [{
+                     position: 'left',
+                     gridLines: {
+                       zeroLineColor: "rgba(0,255,0,1)"
+                     },
+                     scaleLabel: {
+                       display: true,
+                       labelString: 'Sorted elements / time [microseconds]'
+                     },
+                     type: 'linear'
+                   }]
+                 }
+                },
+                data: {
+                  datasets: {{{series}}}
+                }
+            });
+        });
+        </script>
+        {{/chart}}
+        </div>
+    </div>
+  </body>
+</html>
