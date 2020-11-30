@@ -12,3 +12,4 @@ benchmark/src/cmake-build*
 *Makefile*
 *.cmake
 results/charts.html
+results/venv

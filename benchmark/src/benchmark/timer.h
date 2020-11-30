@@ -12,7 +12,7 @@ public:
 
     void start();
     void stop();
-    double elapsed();
+    double elapsed() const;
 };
 
 #else

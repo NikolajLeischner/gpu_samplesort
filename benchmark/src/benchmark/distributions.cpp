@@ -2,9 +2,7 @@
 #include <type_traits>
 #include <random>
 #include <algorithm>
-#include <functional>
 #include <limits>
-#include <math.h>
 #include <numeric>
 #include <iostream>
 #include <map>

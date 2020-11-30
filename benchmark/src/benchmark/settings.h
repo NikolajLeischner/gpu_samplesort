@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <iostream>
 #include <map>
-#include <math.h>
+#include <cmath>
 #include <tclap/CmdLine.h>
 #include "distributions.h"
 #include "keytype.h"

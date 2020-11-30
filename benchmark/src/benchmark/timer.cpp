@@ -10,10 +10,10 @@ void Timer::stop() {
     QueryPerformanceCounter(&end_time);
 }
 
-double Timer::elapsed() {
+double Timer::elapsed() const {
     LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
-    return ((double) (end_time.QuadPart - start_time.QuadPart)) / ((double) (freq.QuadPart / 1000.0));
+    return ((double) (end_time.QuadPart - start_time.QuadPart)) / (double) (freq.QuadPart / 1000.0);
 }
 
 #else

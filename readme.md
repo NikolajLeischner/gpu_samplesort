@@ -1,6 +1,6 @@
 This is an updated implementation of GPU Sample Sort. The algorihm is the same as in the publication, but the code has been cleaned up & modified to work with more recent versions of CUDA and C++ compilers. Scripts for benchmarking the algorithm and for generating charts are included as well.
 
-The code has been compiled & tested with CUDA 10 + MSVC 2017 15.9 on Windows 10 and CUDA 9 + GCC 6.5 on Ubuntu 18.10.
+The code has been compiled & tested with CUDA 11 + MSVC 2019 16.8 on Windows 10 and CUDA 9 + GCC 6.5 on Ubuntu 18.10.
 
 # Requirements
 

@@ -2,8 +2,6 @@
 #include "distributions.h"
 #include "dispatching.h"
 #include "output.h"
-#include "settings.h"
-#include <tclap/CmdLine.h>
 
 int main(int argc, const char *argv[]) {
     using namespace Benchmark;

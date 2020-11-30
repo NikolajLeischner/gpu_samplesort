@@ -170,7 +170,7 @@ namespace SampleSort {
         std::mt19937 gen(rd());
         gen.seed(17);
         std::uniform_int_distribution<int> distribution;
-        Lrand48 *rng = new Lrand48();
+        auto *rng = new Lrand48();
 
         TemporaryDeviceMemory<ValueType> values_buffer(KEYS_ONLY ? size : 0);
 

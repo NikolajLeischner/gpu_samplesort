@@ -34,7 +34,7 @@ namespace SampleSort {
         T *data;
         size_t size;
 
-        TemporaryDeviceMemory(size_t size) : size(size) {
+        explicit TemporaryDeviceMemory(size_t size) : size(size) {
             if (size > 0)
                 cudaMalloc((void **) &data, size * sizeof(T));
             else

@@ -9,7 +9,7 @@ namespace Benchmark {
         const double time;
         const std::size_t size;
 
-        const void write_to_stream(std::ostream &stream) {
+        void write_to_stream(std::ostream &stream) const {
             stream << size << ";" << time << ";" << std::endl;
         }
 

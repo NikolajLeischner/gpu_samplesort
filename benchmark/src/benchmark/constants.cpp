@@ -1,9 +1,7 @@
 #include <algorithm>
-#include <iostream>
 #include <settings.h>
 #include <distributions.h>
 #include <keytype.h>
-#include <tclap/CmdLine.h>
 
 namespace Benchmark {
     Settings Settings::parse_from_cmd(int argc, const char *argv[], bool disable_exception_handling) {

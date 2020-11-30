@@ -1,7 +1,5 @@
 #include "gpu_dispatching.h"
-#include "distributions.h"
 #include <thrust/device_vector.h>
-#include <thrust/sort.h>
 #include "../samplesort/samplesort.h"
 
 
