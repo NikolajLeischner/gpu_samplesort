@@ -62,7 +62,7 @@ namespace Benchmark {
         template<typename KeyType>
         std::vector<Result> execute_with_settings(const Settings &settings) {
             std::vector<Result> results;
-            for (const std::size_t &size : settings.sizes)
+            for (const std::size_t &size: settings.sizes)
                 results.push_back(execute_for_size<KeyType>(settings, size));
             return results;
         }

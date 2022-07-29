@@ -3,7 +3,9 @@
 #include <algorithm>
 
 #ifdef _MSC_VER
+
 #include <ppl.h>
+
 #elif __GNUC__
 #include <parallel/algorithm>
 #endif

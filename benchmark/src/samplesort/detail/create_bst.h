@@ -133,7 +133,7 @@ namespace SampleSort {
 
                     // Depending on the size of the sequence to sort, choose a fitting permutation of odd-even-merge-sort.
                     // This case-distinction saves a few expensive instructions at run time. For sort sizes > 2048 more case
-                    // distinctions would have to be added. Also a minimum block size of 256 is assumed here.
+                    // distinctions would have to be added. Also, a minimum block size of 256 is assumed here.
                     if (size > 1024) {
                         if (CTA_SIZE > 1024)
                             odd_even_sort<KeyType, CompType, 2048>(shared_keys, size, comp);
@@ -167,10 +167,10 @@ namespace SampleSort {
                 if (threadIdx.x == 0) {
                     int middle = (from + to) / 2;
                     KeyType mip = SampleSort::min<KeyType>
-                                  (SampleSort::min<KeyType> (keys[from], keys[to - 1], comp), keys[middle], comp);
+                            (SampleSort::min<KeyType>(keys[from], keys[to - 1], comp), keys[middle], comp);
                     KeyType map = SampleSort::max<KeyType>
-                                  (SampleSort::max<KeyType> (keys[from], keys[to - 1], comp), keys[middle], comp);
-                    pivot = SampleSort::min<KeyType>(SampleSort::max < KeyType > (mip / 2 + map / 2, mip, comp), map, comp);
+                            (SampleSort::max<KeyType>(keys[from], keys[to - 1], comp), keys[middle], comp);
+                    pivot = SampleSort::min<KeyType>(SampleSort::max<KeyType>(mip / 2 + map / 2, mip, comp), map, comp);
                 }
 
                 unsigned int ll = 0;

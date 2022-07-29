@@ -1,13 +1,13 @@
-This is an updated implementation of GPU Sample Sort. The algorihm is the same as in the publication, but the code has been cleaned up & modified to work with more recent versions of CUDA and C++ compilers. Scripts for benchmarking the algorithm and for generating charts are included as well.
+This is an updated implementation of GPU Sample Sort. The algorithm is the same as in the publication, but the code has been cleaned up & modified to work with more recent versions of CUDA and C++ compilers. Scripts for benchmarking the algorithm and for generating charts are included as well.
 
-The code has been compiled & tested with CUDA 11 + MSVC 2019 16.8 on Windows 10 and CUDA 9 + GCC 6.5 on Ubuntu 18.10.
+The code has been compiled & tested with CUDA 11.6 + MSVC 2022 17.0 on Windows 11.
 
 # Requirements
 
-* CUDA 9+
+* CUDA 11+
 * A compatible C++ compiler (e.g. GCC, MSVC)
-* CMAKE 3.12
-* Python 3.6 for generating charts
+* CMAKE 3.18
+* Python 3.10 for generating charts
 
 # References
 

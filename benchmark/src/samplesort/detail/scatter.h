@@ -36,12 +36,12 @@ namespace SampleSort {
     // Bucket-finding & scattering must use the same number of elements per thread.
     template<int K, int LOG_K, int FIND_THREADS, int CTA_SIZE, int COUNTERS, bool DEGENERATED, typename KeyType, typename CompType>
     __global__ void scatter(
-            const KeyType * __restrict__ keys,
+            const KeyType *__restrict__ keys,
             int min_pos,
             int max_pos,
-            KeyType * __restrict__ keys_out,
-            const int * __restrict__ global_buckets,
-            int * __restrict__ bucket_bounds,
+            KeyType *__restrict__ keys_out,
+            const int *__restrict__ global_buckets,
+            int *__restrict__ bucket_bounds,
             int keys_per_thread,
             CompType comp) {
         const int from = blockIdx.x * keys_per_thread * FIND_THREADS + min_pos;
@@ -95,7 +95,8 @@ namespace SampleSort {
         if (blockIdx.x == 0) {
             for (int i = threadIdx.x; i < K; i += CTA_SIZE)
                 bucket_bounds[i] =
-                        min_pos + global_buckets[(i * gridDim.x * COUNTERS) + (gridDim.x - 1) * COUNTERS + COUNTERS - 1];
+                        min_pos +
+                        global_buckets[(i * gridDim.x * COUNTERS) + (gridDim.x - 1) * COUNTERS + COUNTERS - 1];
         }
     }
 
@@ -170,7 +171,8 @@ namespace SampleSort {
         if (blockIdx.x == 0) {
             for (int i = threadIdx.x; i < K; i += CTA_SIZE)
                 bucket_bounds[i] =
-                        min_pos + global_buckets[(i * gridDim.x * COUNTERS) + (gridDim.x - 1) * COUNTERS + COUNTERS - 1];
+                        min_pos +
+                        global_buckets[(i * gridDim.x * COUNTERS) + (gridDim.x - 1) * COUNTERS + COUNTERS - 1];
         }
     }
 }

@@ -25,7 +25,7 @@ namespace Benchmark {
                 {"samplesort",   Algorithm::Value::samplesort},
                 {"cpu_parallel", Algorithm::Value::cpu_parallel},
                 {"cpu_stl",      Algorithm::Value::cpu_stl}};
-    };
+    }
 
     struct Settings {
 
