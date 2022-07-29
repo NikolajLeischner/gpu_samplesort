@@ -6,15 +6,15 @@
 namespace Benchmark {
     template<typename KeyType>
     void sort_by_algorithm(Algorithm::Value algorithm, bool keys_only, std::vector<KeyType> &data) {
-        KeyType *device_keys(0);
-        std::uint64_t *device_values(0);
+        KeyType *device_keys(nullptr);
+        std::uint64_t *device_values(nullptr);
         size_t size = sizeof(KeyType) * data.size();
         cudaMalloc((void **) &device_keys, size);
         cudaMemcpy(device_keys, data.data(), size, cudaMemcpyHostToDevice);
 
         if (keys_only) {
             if (algorithm == Algorithm::Value::thrust) {
-                thrust::device_ptr <KeyType> keys_ptr(device_keys);
+                thrust::device_ptr<KeyType> keys_ptr(device_keys);
                 thrust::sort(keys_ptr, keys_ptr + data.size());
             } else if (algorithm == Algorithm::Value::samplesort) {
                 SampleSort::sort(device_keys, device_keys + data.size());
@@ -26,8 +26,8 @@ namespace Benchmark {
             cudaMemcpy(device_values, values.begin(), values.memory_size(), cudaMemcpyHostToDevice);
 
             if (algorithm == Algorithm::Value::thrust) {
-                thrust::device_ptr <KeyType> keys_ptr(device_keys);
-                thrust::device_ptr <std::uint64_t> values_ptr(device_values);
+                thrust::device_ptr<KeyType> keys_ptr(device_keys);
+                thrust::device_ptr<std::uint64_t> values_ptr(device_values);
                 thrust::sort_by_key(keys_ptr, keys_ptr + data.size(), values_ptr);
             } else if (algorithm == Algorithm::Value::samplesort) {
                 SampleSort::sort_by_key(device_keys, device_keys + data.size(), device_values);
@@ -43,11 +43,11 @@ namespace Benchmark {
 
 
     template void sort_by_algorithm(Algorithm::Value algorithm, bool keys_only,
-                                        std::vector<std::uint16_t> &data);
+                                    std::vector<std::uint16_t> &data);
 
     template void sort_by_algorithm(Algorithm::Value algorithm, bool keys_only,
-                                        std::vector<std::uint32_t> &data);
+                                    std::vector<std::uint32_t> &data);
 
     template void sort_by_algorithm(Algorithm::Value algorithm, bool keys_only,
-                                        std::vector<std::uint64_t> &data);
+                                    std::vector<std::uint64_t> &data);
 }

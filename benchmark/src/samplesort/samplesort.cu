@@ -25,7 +25,6 @@
 * OTHER DEALINGS IN THE SOFTWARE.
 **/
 
-#include <iostream>
 #include <algorithm>
 #include <stack>
 #include <vector>
@@ -34,10 +33,6 @@
 #include <limits>
 #include <thrust/device_ptr.h>
 #include <thrust/scan.h>
-#include <thrust/extrema.h>
-#include <thrust/iterator/iterator_traits.h>
-#include <thrust/detail/type_traits.h>
-#include <thrust/functional.h>
 
 #include "detail/constants.h"
 #include "detail/bucket.h"
@@ -56,8 +51,8 @@ namespace SampleSort {
 
     template<int COPY_THREADS, int MAX_BLOCK_COUNT, bool KEYS_ONLY, typename KeyType, typename ValueType>
     void move_to_output(std::priority_queue<Bucket> &swapped_buckets, KeyType *keys,
-            const TemporaryDeviceMemory<KeyType> &keys_buffer, ValueType *values,
-            const TemporaryDeviceMemory<ValueType> &values_buffer) {
+                        const TemporaryDeviceMemory<KeyType> &keys_buffer, ValueType *values,
+                        const TemporaryDeviceMemory<ValueType> &values_buffer) {
         int batch_size = static_cast<int>(std::min(swapped_buckets.size(), static_cast<size_t>(MAX_BLOCK_COUNT)));
         TemporaryDeviceMemory<Bucket> dev_swapped_bucket_data((size_t) batch_size);
         std::vector<Bucket> swapped_bucket_data;
@@ -84,8 +79,8 @@ namespace SampleSort {
 
     template<int SORT_THREADS, int MAX_BLOCK_COUNT, bool KEYS_ONLY, typename KeyType, typename ValueType, typename CompType>
     void sort_buckets(std::priority_queue<Bucket> &small_buckets, KeyType *keys,
-                        const TemporaryDeviceMemory<KeyType> &keys_buffer, ValueType *values,
-                        const TemporaryDeviceMemory<ValueType> &values_buffer, CompType comp) {
+                      const TemporaryDeviceMemory<KeyType> &keys_buffer, ValueType *values,
+                      const TemporaryDeviceMemory<ValueType> &values_buffer, CompType comp) {
         // Below this size odd-even-merge-sort is used in the CTA sort.
         const unsigned int LOCAL_SORT_SIZE = 2048;
         // Might want to choose a different size for key-value sorting, since the
@@ -123,7 +118,7 @@ namespace SampleSort {
         // How large should the largest bucket be to allow using the smaller oversampling factor?
         const int REDUCED_OVERSAMPLING_LIMIT = 1 << 25;
         // Number of replicated bucket counters per thread block in the bucket finding / scattering kernels.
-        const int COUNTERS = 8;
+        const int COUNTERS = 1;
         // Factor for additional counter replication in the bucket finding kernel.
         const int COUNTER_COPIES = 1;
 
@@ -150,7 +145,8 @@ namespace SampleSort {
         const int size = static_cast<int>(end - begin);
         if (size == 0) return;
 
-        const int block_sort_limit = clamp(static_cast<int>(size / (2 * std::sqrt(static_cast<float>(K)))), 1 << 14, 1 << 18);
+        const int block_sort_limit = clamp(static_cast<int>(size / (2 * std::sqrt(static_cast<float>(K)))), 1 << 14,
+                                           1 << 18);
 
         std::stack<Bucket> large_buckets;
         // Buckets are ordered by size, which improves the performance of the
@@ -168,6 +164,7 @@ namespace SampleSort {
 
         std::random_device rd;
         std::mt19937 gen(rd());
+        // Seeded with a constant value for reproducible benchmark results.
         gen.seed(17);
         std::uniform_int_distribution<int> distribution;
         auto *rng = new Lrand48();
@@ -183,7 +180,8 @@ namespace SampleSort {
                 Bucket b = large_buckets.top();
                 // Adjust the number of elements/thread according to the bucket size.
                 int keys_per_thread =
-                        static_cast<int>(std::max(1, static_cast<int>(ceil(static_cast<double>(b.size) / (DESIRED_CTA_COUNT * FIND_THREADS)))));
+                        static_cast<int>(std::max(1, static_cast<int>(ceil(
+                                static_cast<double>(b.size) / (DESIRED_CTA_COUNT * FIND_THREADS)))));
                 int block_count =
                         static_cast<int>(ceil((static_cast<double>(b.size) / (keys_per_thread * FIND_THREADS))));
 
@@ -211,12 +209,14 @@ namespace SampleSort {
                 TemporaryDeviceMemory<KeyType> sample(SMALL_A * K * buckets.size());
                 TemporaryDeviceMemory<KeyType> sample_buffer(SMALL_A * K * buckets.size());
                 create_bst<K, SMALL_A, BST_THREADS, LOCAL_SORT_SIZE> <<<bst_blocks, BST_THREADS>>>
-                        (keys, keys_buffer.data, dev_bucketParams.data, bst.data, sample.data, sample_buffer.data, *rng, comp);
+                        (keys, keys_buffer.data, dev_bucketParams.data, bst.data, sample.data, sample_buffer.data, *rng,
+                         comp);
             } else {
                 TemporaryDeviceMemory<KeyType> sample(A * K * buckets.size());
                 TemporaryDeviceMemory<KeyType> sample_buffer(A * K * buckets.size());
                 create_bst<K, A, BST_THREADS, LOCAL_SORT_SIZE> <<<bst_blocks, BST_THREADS>>>
-                        (keys, keys_buffer.data, dev_bucketParams.data, bst.data, sample.data, sample_buffer.data, *rng, comp);
+                        (keys, keys_buffer.data, dev_bucketParams.data, bst.data, sample.data, sample_buffer.data, *rng,
+                         comp);
             }
 
             rng->destroy();
@@ -237,7 +237,8 @@ namespace SampleSort {
             for (int i = 0; i < buckets.size(); ++i) {
                 Bucket b = buckets[i];
 
-                int block_count = static_cast<int>(ceil(static_cast<double>(b.size) / (FIND_THREADS * b.keys_per_thread)));
+                int block_count = static_cast<int>(ceil(
+                        static_cast<double>(b.size) / (FIND_THREADS * b.keys_per_thread)));
 
                 int from = b.start;
                 int to = b.start + b.size;
@@ -251,7 +252,7 @@ namespace SampleSort {
 
                 // If all keys in the sample are equal, check if the whole bucket contains only one key.
                 if (b.degenerated) {
-                    thrust::device_ptr <KeyType> dev_input(input + from);
+                    thrust::device_ptr<KeyType> dev_input(input + from);
                     KeyType min_key, max_key;
                     cudaMemcpy(&min_key, thrust::min_element(dev_input, dev_input + b.size).get(), sizeof(KeyType),
                                cudaMemcpyDeviceToHost);
@@ -268,10 +269,10 @@ namespace SampleSort {
                 // Find buckets.
                 if (!b.degenerated)
                     find_buckets<K, LOG_K, FIND_THREADS, COUNTERS, COUNTER_COPIES, false>
-                            <<<block_count, FIND_THREADS>>> (input, from, to, dev_bucket_counters.data, b.keys_per_thread, comp);
+                    <<<block_count, FIND_THREADS>>>(input, from, to, dev_bucket_counters.data, b.keys_per_thread, comp);
                 else
                     find_buckets<K, LOG_K, FIND_THREADS, COUNTERS, COUNTER_COPIES, true>
-                            <<<block_count, FIND_THREADS>>> (input, from, to, dev_bucket_counters.data, b.keys_per_thread, comp);
+                    <<<block_count, FIND_THREADS>>>(input, from, to, dev_bucket_counters.data, b.keys_per_thread, comp);
 
                 // Scan over the bucket counters, yielding the array positions the blocks of the scattering kernel need to write to.
                 thrust::device_ptr<int> dev_counters(dev_bucket_counters.data);
@@ -280,21 +281,24 @@ namespace SampleSort {
                 if (KEYS_ONLY) {
                     if (!b.degenerated)
                         scatter<K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, false>
-                                <<<block_count, SCATTER_THREADS>>> (input, from, to, output, dev_bucket_counters.data,
-                                        dev_new_bucket_bounds.data + K * i, b.keys_per_thread, comp);
+                        <<<block_count, SCATTER_THREADS>>>(input, from, to, output, dev_bucket_counters.data,
+                                                           dev_new_bucket_bounds.data + K * i, b.keys_per_thread, comp);
                     else
                         scatter<K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, true>
-                                <<<block_count, SCATTER_THREADS >>> (input, from, to, output, dev_bucket_counters.data,
-                                        dev_new_bucket_bounds.data + K * i, b.keys_per_thread, comp);
+                        <<<block_count, SCATTER_THREADS >>>(input, from, to, output, dev_bucket_counters.data,
+                                                            dev_new_bucket_bounds.data + K * i, b.keys_per_thread,
+                                                            comp);
                 } else {
                     if (!b.degenerated)
                         scatter<K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, false>
-                                <<<block_count, SCATTER_THREADS>>> (input, values_input, from, to, output, values_output,
-                                        dev_bucket_counters.data, dev_new_bucket_bounds.data + K * i, b.keys_per_thread, comp);
+                        <<<block_count, SCATTER_THREADS>>>(input, values_input, from, to, output, values_output,
+                                                           dev_bucket_counters.data, dev_new_bucket_bounds.data + K * i,
+                                                           b.keys_per_thread, comp);
                     else
                         scatter<K, LOG_K, FIND_THREADS, SCATTER_THREADS, COUNTERS, true>
-                                <<<block_count, SCATTER_THREADS>>> (input, values_input, from, to, output, values_output,
-                                        dev_bucket_counters.data, dev_new_bucket_bounds.data + K * i, b.keys_per_thread, comp);
+                        <<<block_count, SCATTER_THREADS>>>(input, values_input, from, to, output, values_output,
+                                                           dev_bucket_counters.data, dev_new_bucket_bounds.data + K * i,
+                                                           b.keys_per_thread, comp);
                 }
             }
 

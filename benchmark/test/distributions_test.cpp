@@ -1,6 +1,7 @@
 #include <bandit/bandit.h>
 
 using namespace bandit;
+using namespace snowhouse;
 
 #include "../src/benchmark/distributions.h"
 
@@ -95,7 +96,6 @@ go_bandit([]() {
         });
 
         describe("deterministic duplicates distributions", [&]() {
-            std::size_t range(100);
             assert_common_properties(deterministic_duplicates<std::uint32_t>(size, settings, p),
                                      deterministic_duplicates<std::uint32_t>(size, settings, p), size);
         });

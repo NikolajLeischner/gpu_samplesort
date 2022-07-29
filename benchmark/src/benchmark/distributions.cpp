@@ -272,12 +272,12 @@ namespace Distributions {
         auto iterator = content.begin();
         for (std::uint64_t i = 2; i < p; i *= 2) {
             auto end = iterator + (size / i);
-            std::fill(iterator, end, (T) (log((double) size * 2 / i) / log(2.0)));
+            std::fill(iterator, end, (T) (log((double) size * 2 / (double) i) / log(2.0)));
             iterator = end;
         }
         for (std::uint64_t i = 2; i < p; i *= 2) {
             auto end = iterator + (p / i);
-            std::fill(iterator, end, (T) (log((double) size * 2 / i) / log(2.0)));
+            std::fill(iterator, end, (T) (log((double) size * 2 / (double) i) / log(2.0)));
             iterator = end;
         }
 
@@ -287,11 +287,14 @@ namespace Distributions {
         return Distribution<T>(content);
     }
 
-    template class Distribution<std::uint16_t>;
+    template
+    class Distribution<std::uint16_t>;
 
-    template class Distribution<std::uint32_t>;
+    template
+    class Distribution<std::uint32_t>;
 
-    template class Distribution<std::uint64_t>;
+    template
+    class Distribution<std::uint64_t>;
 
     template Distribution<std::uint16_t>
     create(Type::Value type, std::uint64_t size, const Settings &settings, std::uint32_t p, std::uint32_t g,

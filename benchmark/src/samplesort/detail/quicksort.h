@@ -133,11 +133,11 @@ namespace SampleSort {
             } else {
                 if (threadIdx.x == 0) {
                     KeyType mip = SampleSort::min<KeyType>
-                                  (SampleSort::min<KeyType> (keys[from], keys[to - 1], comp), keys[(from + to) /
-                                                                                                      2], comp);
+                            (SampleSort::min<KeyType>(keys[from], keys[to - 1], comp), keys[(from + to) /
+                                                                                            2], comp);
                     KeyType map = SampleSort::max<KeyType>
-                                  (SampleSort::max<KeyType> (keys[from], keys[to - 1], comp), keys[(from + to) /
-                                                                                                      2], comp);
+                            (SampleSort::max<KeyType>(keys[from], keys[to - 1], comp), keys[(from + to) /
+                                                                                            2], comp);
                     pivot = SampleSort::min<KeyType>(SampleSort::max<KeyType>(mip / 2 + map / 2, mip, comp), map, comp);
                 }
 
@@ -324,32 +324,38 @@ namespace SampleSort {
                         if (CTA_SIZE > 1024)
                             odd_even_sort<KeyType, ValueType, CompType, 2048>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 2048, CTA_SIZE>(shared, shared_values, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 2048, CTA_SIZE>(shared, shared_values, size,
+                                                                                        comp);
                     } else if (size > 512) {
                         if (CTA_SIZE > 512)
                             odd_even_sort<KeyType, ValueType, CompType, 1024>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 1024, CTA_SIZE>(shared, shared_values, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 1024, CTA_SIZE>(shared, shared_values, size,
+                                                                                        comp);
                     } else if (size > 256) {
                         if (CTA_SIZE > 256)
                             odd_even_sort<KeyType, ValueType, CompType, 512>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 512, CTA_SIZE>(shared, shared_values, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 512, CTA_SIZE>(shared, shared_values, size,
+                                                                                       comp);
                     } else if (size > 128) {
                         if (CTA_SIZE > 128)
                             odd_even_sort<KeyType, ValueType, CompType, 256>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 256, CTA_SIZE>(shared, shared_values, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 256, CTA_SIZE>(shared, shared_values, size,
+                                                                                       comp);
                     } else if (size > 64) {
                         if (CTA_SIZE > 64)
                             odd_even_sort<KeyType, ValueType, CompType, 128>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 128, CTA_SIZE>(shared, shared_values, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 128, CTA_SIZE>(shared, shared_values, size,
+                                                                                       comp);
                     } else if (size > 32) {
                         if (CTA_SIZE > 32)
                             odd_even_sort<KeyType, ValueType, CompType, 64>(shared, shared_values, size, comp);
                         else
-                            odd_even_sort<KeyType, ValueType, CompType, 64, CTA_SIZE>(shared, shared_values, size, comp);
+                            odd_even_sort<KeyType, ValueType, CompType, 64, CTA_SIZE>(shared, shared_values, size,
+                                                                                      comp);
                     } else
                         odd_even_sort<KeyType, ValueType, CompType, 32>(shared, shared_values, size, comp);
 
@@ -368,10 +374,10 @@ namespace SampleSort {
             else {
                 if (threadIdx.x == 0) {
                     KeyType mip = SampleSort::min<KeyType>
-                                  (SampleSort::min<KeyType>(keys[from], keys[to - 1]), keys[(from + to) / 2]);
+                            (SampleSort::min<KeyType>(keys[from], keys[to - 1]), keys[(from + to) / 2]);
                     KeyType map = SampleSort::max<KeyType>
-                                  (SampleSort::max<KeyType>(keys[from], keys[to - 1]), keys[(from + to) / 2]);
-                    pivot = SampleSort::min<KeyType> (SampleSort::max < KeyType > (mip / 2 + map / 2, mip), map);
+                            (SampleSort::max<KeyType>(keys[from], keys[to - 1]), keys[(from + to) / 2]);
+                    pivot = SampleSort::min<KeyType>(SampleSort::max<KeyType>(mip / 2 + map / 2, mip), map);
                 }
 
                 unsigned int ll = 0;
@@ -479,7 +485,8 @@ namespace SampleSort {
 
                 // Write the keys/values equal to the pivot to the output array since
                 // their final position is known.
-                for (int i = from + small_block[CTA_SIZE] + threadIdx.x; i < to - large_block[CTA_SIZE]; i += CTA_SIZE) {
+                for (int i = from + small_block[CTA_SIZE] + threadIdx.x;
+                     i < to - large_block[CTA_SIZE]; i += CTA_SIZE) {
                     keys_input[i] = keys2[i];
                     values_input[i] = values2[i];
                 }

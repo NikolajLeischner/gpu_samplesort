@@ -18,7 +18,7 @@ namespace SampleSort {
         static const unsigned long long c = 0xB;
 
         void init(int threads, int seed) {
-            uint2 *seeds = new uint2[threads];
+            auto *seeds = new uint2[threads];
 
             cudaMalloc((void **) &state, threads * sizeof(uint2));
 
@@ -48,7 +48,7 @@ namespace SampleSort {
             delete[] seeds;
         }
 
-        void destroy() {
+        void destroy() const {
             cudaFree((void *) state);
         }
     };
